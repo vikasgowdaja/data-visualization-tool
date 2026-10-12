@@ -115,8 +115,13 @@ jobs:
       - name: Capture image references
         id: image_outputs
         run: |
-          echo "backend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "frontend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.image_publish.outputs.can_push }}" = "true" ]; then
+            echo "backend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "frontend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend_image=" >> "$GITHUB_OUTPUT"
+            echo "frontend_image=" >> "$GITHUB_OUTPUT"
+          fi
 
   deploy-to-kubernetes:
     needs: build-and-push-images
@@ -128,8 +133,10 @@ jobs:
         env:
           CAN_PUSH_IMAGES: ${{ needs.build-and-push-images.outputs.can_push }}
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+          BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
         run: |
-          if [ "$CAN_PUSH_IMAGES" = "true" ] && [ -n "$KUBE_CONFIG_B64" ]; then
+          if [ "$CAN_PUSH_IMAGES" = "true" ] && [ -n "$KUBE_CONFIG_B64" ] && [ -n "$BACKEND_IMAGE" ] && [ -n "$FRONTEND_IMAGE" ]; then
             echo "can_deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "can_deploy=false" >> "$GITHUB_OUTPUT"
