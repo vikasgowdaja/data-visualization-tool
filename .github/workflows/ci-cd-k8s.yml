@@ -83,29 +83,7 @@ jobs:
             echo "image_namespace=local" >> "$GITHUB_OUTPUT"
           fi
           if [ -n "$KUBE_CONFIG_B64" ]; then
-            KUBE_SERVER="$(echo "$KUBE_CONFIG_B64" | base64 --decode 2>/dev/null | awk '/^[[:space:]]*server:/{print $2; exit}')"
-            KUBE_SERVER="${KUBE_SERVER%\"}"
-            KUBE_SERVER="${KUBE_SERVER#\"}"
-            KUBE_SERVER_HOST="${KUBE_SERVER#*://}"
-            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%/*}"
-            if [[ "$KUBE_SERVER_HOST" == \[* ]]; then
-              KUBE_SERVER_HOST="${KUBE_SERVER_HOST#[}"
-              KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%]*}"
-            else
-              KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
-            fi
-            IS_LOCAL_KUBE_SERVER=false
-            case "$KUBE_SERVER_HOST" in
-              localhost|127.0.0.1|::1|0:0:0:0:0:0:0:1)
-                IS_LOCAL_KUBE_SERVER=true
-                ;;
-            esac
-            if [ -n "$KUBE_SERVER_HOST" ] && [ "$IS_LOCAL_KUBE_SERVER" = false ]; then
-              echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
-              echo "Kubeconfig server is missing or local-only; skipping deploy job."
-            fi
+            echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
           fi
@@ -164,10 +142,39 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
 
+      - name: Validate kubeconfig endpoint
+        id: deploy_prereq
+        run: |
+          KUBE_SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+          KUBE_SERVER="${KUBE_SERVER%\"}"
+          KUBE_SERVER="${KUBE_SERVER#\"}"
+          KUBE_SERVER_HOST="${KUBE_SERVER#*://}"
+          KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%/*}"
+          if [[ "$KUBE_SERVER_HOST" == \[* ]]; then
+            KUBE_SERVER_HOST="${KUBE_SERVER_HOST#[}"
+            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%]*}"
+          else
+            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
+          fi
+          IS_LOCAL_KUBE_SERVER=false
+          case "$KUBE_SERVER_HOST" in
+            localhost|127.*|::1|0:0:0:0:0:0:0:1|0000:0000:0000:0000:0000:0000:0000:0001)
+              IS_LOCAL_KUBE_SERVER=true
+              ;;
+          esac
+          if [ -n "$KUBE_SERVER_HOST" ] && [ "$IS_LOCAL_KUBE_SERVER" = false ]; then
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+            echo "Kubeconfig server is missing or local-only; skipping deploy steps."
+          fi
+
       - name: Apply manifests
+        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
         run: kubectl apply -k k8s
 
       - name: Update images and rollout
+        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
         env:
           BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
@@ -178,4 +185,5 @@ jobs:
           kubectl -n "$K8S_NAMESPACE" rollout status deployment/datascience-lab-frontend --timeout=180s
 
       - name: Deployment snapshot
+        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
         run: kubectl -n "$K8S_NAMESPACE" get deploy,pods,svc,ingress
