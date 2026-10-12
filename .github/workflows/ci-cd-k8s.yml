@@ -157,8 +157,11 @@ jobs:
             KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
           fi
           IS_LOCAL_KUBE_SERVER=false
+          if [[ "$KUBE_SERVER_HOST" =~ ^127\. ]]; then
+            IS_LOCAL_KUBE_SERVER=true
+          fi
           case "$KUBE_SERVER_HOST" in
-            localhost|127.*|::1|0:0:0:0:0:0:0:1)
+            localhost|::1|0:0:0:0:0:0:0:1)
               IS_LOCAL_KUBE_SERVER=true
               ;;
           esac
