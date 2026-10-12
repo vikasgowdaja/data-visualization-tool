@@ -151,7 +151,7 @@ jobs:
           KUBE_SERVER_HOST="${KUBE_SERVER#*://}"
           KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%/*}"
           if [[ "$KUBE_SERVER_HOST" == \[* ]]; then
-            KUBE_SERVER_HOST="${KUBE_SERVER_HOST#[}"
+            KUBE_SERVER_HOST="${KUBE_SERVER_HOST#\[}"
             KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%]*}"
           else
             KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
