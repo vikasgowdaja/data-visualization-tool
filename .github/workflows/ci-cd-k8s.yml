@@ -68,14 +68,18 @@ jobs:
       - name: Evaluate image publish settings
         id: image_publish
         env:
-          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_USERNAME_VAR: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_USERNAME_SECRET: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
+          DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME_VAR:-$DOCKERHUB_USERNAME_SECRET}"
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
             echo "can_push=true" >> "$GITHUB_OUTPUT"
+            echo "dockerhub_username=$DOCKERHUB_USERNAME" >> "$GITHUB_OUTPUT"
             echo "image_namespace=$DOCKERHUB_USERNAME" >> "$GITHUB_OUTPUT"
           else
             echo "can_push=false" >> "$GITHUB_OUTPUT"
+            echo "dockerhub_username=" >> "$GITHUB_OUTPUT"
             echo "image_namespace=local" >> "$GITHUB_OUTPUT"
           fi
 
@@ -83,7 +87,7 @@ jobs:
         if: ${{ steps.image_publish.outputs.can_push == 'true' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+          username: ${{ steps.image_publish.outputs.dockerhub_username }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push backend image
@@ -91,7 +95,7 @@ jobs:
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: ${{ steps.image_publish.outputs.can_push == 'true' }}
+          push: ${{ fromJSON(steps.image_publish.outputs.can_push) }}
           tags: |
             ${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}
             ${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:latest
@@ -103,7 +107,7 @@ jobs:
           file: ./frontend/Dockerfile
           build-args: |
             VITE_API_BASE_URL=/api
-          push: ${{ steps.image_publish.outputs.can_push == 'true' }}
+          push: ${{ fromJSON(steps.image_publish.outputs.can_push) }}
           tags: |
             ${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}
             ${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:latest
