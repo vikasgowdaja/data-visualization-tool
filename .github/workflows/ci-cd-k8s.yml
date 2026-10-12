@@ -132,12 +132,9 @@ jobs:
       - name: Evaluate deploy prerequisites
         id: deploy_prereqs
         env:
-          CAN_PUSH_IMAGES: ${{ needs.build-and-push-images.outputs.can_push }}
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
-          BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
         run: |
-          if [ "$CAN_PUSH_IMAGES" = "true" ] && [ -n "$KUBE_CONFIG_B64" ] && [ -n "$BACKEND_IMAGE" ] && [ -n "$FRONTEND_IMAGE" ]; then
+          if [ -n "$KUBE_CONFIG_B64" ]; then
             echo "can_deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "can_deploy=false" >> "$GITHUB_OUTPUT"
