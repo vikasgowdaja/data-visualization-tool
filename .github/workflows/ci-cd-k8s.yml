@@ -13,8 +13,6 @@ env:
   K8S_NAMESPACE: data-visualization-tool
   BACKEND_IMAGE_REPO: datascience-lab-backend
   FRONTEND_IMAGE_REPO: datascience-lab-frontend
-  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
-  DOCKER_IMAGE_NAMESPACE: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME || 'local' }}
 
 jobs:
   test-and-build-app:
@@ -66,11 +64,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Evaluate image publish settings
+        id: image_publish
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "can_push=true" >> "$GITHUB_OUTPUT"
+            echo "image_namespace=$DOCKERHUB_USERNAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "can_push=false" >> "$GITHUB_OUTPUT"
+            echo "image_namespace=local" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Log in to Docker Hub
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ steps.image_publish.outputs.can_push == 'true' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
+          username: ${{ steps.image_publish.outputs.image_namespace }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push backend image
@@ -78,10 +90,10 @@ jobs:
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          push: ${{ steps.image_publish.outputs.can_push == 'true' }}
           tags: |
-            ${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}
-            ${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_REPO }}:latest
+            ${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}
+            ${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:latest
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
@@ -90,32 +102,45 @@ jobs:
           file: ./frontend/Dockerfile
           build-args: |
             VITE_API_BASE_URL=/api
-          push: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          push: ${{ steps.image_publish.outputs.can_push == 'true' }}
           tags: |
-            ${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}
-            ${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_REPO }}:latest
+            ${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}
+            ${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:latest
 
       - name: Capture image references
         id: image_outputs
         run: |
-          echo "backend_image=${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "frontend_image=${{ env.DOCKER_IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   deploy-to-kubernetes:
     needs: build-and-push-images
     runs-on: ubuntu-latest
 
     steps:
+      - name: Evaluate deploy prerequisites
+        id: deploy_prereqs
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] && [ -n "$KUBE_CONFIG_B64" ]; then
+            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "can_deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up kubectl
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         env:
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
@@ -123,11 +148,11 @@ jobs:
           echo "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
 
       - name: Apply manifests
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         run: kubectl apply -k k8s
 
       - name: Update images and rollout
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         env:
           BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
@@ -138,5 +163,5 @@ jobs:
           kubectl -n "$K8S_NAMESPACE" rollout status deployment/datascience-lab-frontend --timeout=180s
 
       - name: Deployment snapshot
-        if: ${{ env.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' && secrets.KUBE_CONFIG_B64 != '' }}
+        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         run: kubectl -n "$K8S_NAMESPACE" get deploy,pods,svc,ingress
