@@ -115,13 +115,8 @@ jobs:
       - name: Capture image references
         id: image_outputs
         run: |
-          if [ "${{ steps.image_publish.outputs.can_push }}" = "true" ]; then
-            echo "backend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "frontend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "backend_image=" >> "$GITHUB_OUTPUT"
-            echo "frontend_image=" >> "$GITHUB_OUTPUT"
-          fi
+          echo "backend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.BACKEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${{ steps.image_publish.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE_REPO }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   deploy-to-kubernetes:
     needs: build-and-push-images
