@@ -56,6 +56,7 @@ jobs:
     outputs:
       backend_image: ${{ steps.image_outputs.outputs.backend_image }}
       frontend_image: ${{ steps.image_outputs.outputs.frontend_image }}
+      can_push: ${{ steps.image_publish.outputs.can_push }}
 
     steps:
       - name: Checkout
@@ -121,11 +122,10 @@ jobs:
       - name: Evaluate deploy prerequisites
         id: deploy_prereqs
         env:
-          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          CAN_PUSH_IMAGES: ${{ needs.build-and-push-images.outputs.can_push }}
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
-          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] && [ -n "$KUBE_CONFIG_B64" ]; then
+          if [ "$CAN_PUSH_IMAGES" = "true" ] && [ -n "$KUBE_CONFIG_B64" ]; then
             echo "can_deploy=true" >> "$GITHUB_OUTPUT"
           else
             echo "can_deploy=false" >> "$GITHUB_OUTPUT"
