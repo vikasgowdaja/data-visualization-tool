@@ -1,12 +1,16 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
 
 
-client = TestClient(app)
+@pytest.fixture
+def client() -> TestClient:
+    with TestClient(app) as test_client:
+        yield test_client
 
 
-def _generate_dataset() -> str:
+def _generate_dataset(client: TestClient) -> str:
     payload = {
         'dataset': 'student_performance',
         'num_records': 200,
@@ -23,15 +27,15 @@ def _generate_dataset() -> str:
     return body['dataset_id']
 
 
-def test_health_and_readiness() -> None:
+def test_health_and_readiness(client: TestClient) -> None:
     health = client.get('/api/health')
     readiness = client.get('/api/readiness')
     assert health.status_code == 200
     assert readiness.status_code == 200
 
 
-def test_generate_and_paginated_rows() -> None:
-    dataset_id = _generate_dataset()
+def test_generate_and_paginated_rows(client: TestClient) -> None:
+    dataset_id = _generate_dataset(client)
 
     rows = client.get(
         f'/api/datasets/{dataset_id}/rows/paginated',
@@ -52,8 +56,8 @@ def test_generate_and_paginated_rows() -> None:
     assert 'rows' in body
 
 
-def test_invalid_pagination_validation() -> None:
-    dataset_id = _generate_dataset()
+def test_invalid_pagination_validation(client: TestClient) -> None:
+    dataset_id = _generate_dataset(client)
     rows = client.get(
         f'/api/datasets/{dataset_id}/rows/paginated',
         params={
@@ -64,7 +68,7 @@ def test_invalid_pagination_validation() -> None:
     assert rows.status_code == 422
 
 
-def test_sessions_crud() -> None:
+def test_sessions_crud(client: TestClient) -> None:
     created = client.post('/api/sessions', json={'name': 'Test Session', 'state_json': '{"k":1}'})
     assert created.status_code == 200
     session_id = created.json()['session_id']
@@ -84,7 +88,7 @@ def test_sessions_crud() -> None:
     assert deleted.status_code == 200
 
 
-def test_progress_summary() -> None:
+def test_progress_summary(client: TestClient) -> None:
     event = client.post('/api/progress/events', json={'module': 'practice', 'event_type': 'question_attempted', 'score': 1})
     assert event.status_code == 200
 
@@ -93,7 +97,7 @@ def test_progress_summary() -> None:
     assert 'total_events' in summary.json()
 
 
-def test_upload_dataset_and_explore() -> None:
+def test_upload_dataset_and_explore(client: TestClient) -> None:
     csv_content = 'city,population,score\nA,1000,7.5\nB,2000,8.1\n'
     response = client.post(
         '/api/datasets/upload',
