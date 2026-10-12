@@ -125,7 +125,7 @@ jobs:
 
   deploy-to-kubernetes:
     needs: build-and-push-images
-    if: ${{ needs.build-and-push-images.outputs.can_push == 'true' && needs.build-and-push-images.outputs.backend_image != '' && needs.build-and-push-images.outputs.frontend_image != '' }}
+    if: ${{ needs.build-and-push-images.outputs.can_push == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -137,6 +137,7 @@ jobs:
           if [ -n "$KUBE_CONFIG_B64" ]; then
             echo "can_deploy=true" >> "$GITHUB_OUTPUT"
           else
+            echo "::warning::KUBE_CONFIG_B64 is not set; skipping deploy."
             echo "can_deploy=false" >> "$GITHUB_OUTPUT"
           fi
 
