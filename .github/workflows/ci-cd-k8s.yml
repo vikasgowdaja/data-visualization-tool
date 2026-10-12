@@ -82,7 +82,7 @@ jobs:
         if: ${{ steps.image_publish.outputs.can_push == 'true' }}
         uses: docker/login-action@v3
         with:
-          username: ${{ steps.image_publish.outputs.image_namespace }}
+          username: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push backend image
