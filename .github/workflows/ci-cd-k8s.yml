@@ -83,7 +83,13 @@ jobs:
             echo "image_namespace=local" >> "$GITHUB_OUTPUT"
           fi
           if [ -n "$KUBE_CONFIG_B64" ]; then
-            echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
+            KUBE_SERVER="$(echo "$KUBE_CONFIG_B64" | base64 --decode 2>/dev/null | awk '/^[[:space:]]*server:/{print $2; exit}')"
+            if [ -n "$KUBE_SERVER" ] && [[ "$KUBE_SERVER" != *"127.0.0.1"* ]] && [[ "$KUBE_SERVER" != *"localhost"* ]]; then
+              echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
+              echo "Kubeconfig server is missing or local-only; skipping deploy job."
+            fi
           else
             echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
           fi
