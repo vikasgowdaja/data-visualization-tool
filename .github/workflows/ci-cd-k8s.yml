@@ -86,7 +86,21 @@ jobs:
             KUBE_SERVER="$(echo "$KUBE_CONFIG_B64" | base64 --decode 2>/dev/null | awk '/^[[:space:]]*server:/{print $2; exit}')"
             KUBE_SERVER="${KUBE_SERVER%\"}"
             KUBE_SERVER="${KUBE_SERVER#\"}"
-            if [ -n "$KUBE_SERVER" ] && ! echo "$KUBE_SERVER" | grep -Eiq '(localhost|127\.0\.0\.1|\[::1\]|::1|0:0:0:0:0:0:0:1)'; then
+            KUBE_SERVER_HOST="${KUBE_SERVER#*://}"
+            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%/*}"
+            if [[ "$KUBE_SERVER_HOST" == \[* ]]; then
+              KUBE_SERVER_HOST="${KUBE_SERVER_HOST#[}"
+              KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%]*}"
+            else
+              KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
+            fi
+            IS_LOCAL_KUBE_SERVER=false
+            case "$KUBE_SERVER_HOST" in
+              localhost|127.0.0.1|::1|0:0:0:0:0:0:0:1)
+                IS_LOCAL_KUBE_SERVER=true
+                ;;
+            esac
+            if [ -n "$KUBE_SERVER_HOST" ] && [ "$IS_LOCAL_KUBE_SERVER" = false ]; then
               echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
             else
               echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
