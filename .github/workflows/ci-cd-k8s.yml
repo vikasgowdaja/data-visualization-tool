@@ -125,6 +125,7 @@ jobs:
 
   deploy-to-kubernetes:
     needs: build-and-push-images
+    if: ${{ needs.build-and-push-images.outputs.can_push == 'true' && needs.build-and-push-images.outputs.backend_image != '' && needs.build-and-push-images.outputs.frontend_image != '' }}
     runs-on: ubuntu-latest
 
     steps:
