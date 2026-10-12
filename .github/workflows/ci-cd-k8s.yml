@@ -146,31 +146,28 @@ jobs:
         id: deploy_prereq
         run: |
           KUBE_SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
-          KUBE_SERVER="${KUBE_SERVER%\"}"
-          KUBE_SERVER="${KUBE_SERVER#\"}"
-          KUBE_SERVER_HOST="${KUBE_SERVER#*://}"
-          KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%/*}"
-          if [[ "$KUBE_SERVER_HOST" == \[* ]]; then
-            KUBE_SERVER_HOST="${KUBE_SERVER_HOST#\[}"
-            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%]*}"
-          else
-            KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
-          fi
-          IS_LOCAL_KUBE_SERVER="$(KUBE_SERVER_HOST="$KUBE_SERVER_HOST" python3 - <<'PY'
+          if ! DEPLOY_READY="$(KUBE_SERVER="$KUBE_SERVER" python3 - <<'PY'
           import ipaddress
           import os
+          from urllib.parse import urlparse
 
-          host = os.environ.get("KUBE_SERVER_HOST", "").strip().lower()
-          if not host or host == "localhost":
-              print("true")
+          server = os.environ.get("KUBE_SERVER", "").strip().strip('"').strip("'")
+          if not server:
+              print("false")
           else:
-              try:
-                  print("true" if ipaddress.ip_address(host).is_loopback else "false")
-              except ValueError:
+              host = urlparse(server).hostname
+              if not host or host.lower() == "localhost":
                   print("false")
+              else:
+                  try:
+                      print("false" if ipaddress.ip_address(host).is_loopback else "true")
+                  except ValueError:
+                      print("true")
           PY
-          )"
-          if [ -n "$KUBE_SERVER_HOST" ] && [ "$IS_LOCAL_KUBE_SERVER" = false ]; then
+          )"; then
+            DEPLOY_READY="false"
+          fi
+          if [ "$DEPLOY_READY" = "true" ]; then
             echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
