@@ -156,15 +156,20 @@ jobs:
           else
             KUBE_SERVER_HOST="${KUBE_SERVER_HOST%%:*}"
           fi
-          IS_LOCAL_KUBE_SERVER=false
-          if [[ "$KUBE_SERVER_HOST" =~ ^127\. ]]; then
-            IS_LOCAL_KUBE_SERVER=true
-          fi
-          case "$KUBE_SERVER_HOST" in
-            localhost|::1|0:0:0:0:0:0:0:1)
-              IS_LOCAL_KUBE_SERVER=true
-              ;;
-          esac
+          IS_LOCAL_KUBE_SERVER="$(KUBE_SERVER_HOST="$KUBE_SERVER_HOST" python3 - <<'PY'
+          import ipaddress
+          import os
+
+          host = os.environ.get("KUBE_SERVER_HOST", "").strip().lower()
+          if not host or host == "localhost":
+              print("true")
+          else:
+              try:
+                  print("true" if ipaddress.ip_address(host).is_loopback else "false")
+              except ValueError:
+                  print("false")
+          PY
+          )"
           if [ -n "$KUBE_SERVER_HOST" ] && [ "$IS_LOCAL_KUBE_SERVER" = false ]; then
             echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
           else
