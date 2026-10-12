@@ -146,7 +146,7 @@ jobs:
         id: deploy_prereq
         run: |
           KUBE_SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
-          if ! DEPLOY_READY="$(KUBE_SERVER="$KUBE_SERVER" python3 - <<'PY'
+          DEPLOY_READY="$({ KUBE_SERVER="$KUBE_SERVER" python3 - <<'PY'
           import ipaddress
           import os
           from urllib.parse import urlparse
@@ -164,13 +164,16 @@ jobs:
                   except ValueError:
                       print("true")
           PY
-          )"; then
+          } 2>/dev/null || echo false)"
+          case "$DEPLOY_READY" in
+            true|false) ;;
+            *)
+              DEPLOY_READY="false"
+              ;;
+          esac
+          echo "deploy_ready=$DEPLOY_READY" >> "$GITHUB_OUTPUT"
+          if [ "$DEPLOY_READY" != "true" ]; then
             DEPLOY_READY="false"
-          fi
-          if [ "$DEPLOY_READY" = "true" ]; then
-            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
             echo "Kubeconfig server is missing or local-only; skipping deploy steps."
           fi
 
