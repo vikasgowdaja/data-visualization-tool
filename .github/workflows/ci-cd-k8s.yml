@@ -57,6 +57,7 @@ jobs:
       backend_image: ${{ steps.image_outputs.outputs.backend_image }}
       frontend_image: ${{ steps.image_outputs.outputs.frontend_image }}
       can_push: ${{ steps.image_publish.outputs.can_push }}
+      has_kubeconfig: ${{ steps.image_publish.outputs.has_kubeconfig }}
 
     steps:
       - name: Checkout
@@ -71,6 +72,7 @@ jobs:
           DOCKERHUB_USERNAME_VAR: ${{ vars.DOCKERHUB_USERNAME }}
           DOCKERHUB_USERNAME_SECRET: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
           DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME_VAR:-$DOCKERHUB_USERNAME_SECRET}"
           if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
@@ -81,6 +83,11 @@ jobs:
             echo "can_push=false" >> "$GITHUB_OUTPUT"
             echo "dockerhub_username=" >> "$GITHUB_OUTPUT"
             echo "image_namespace=local" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$KUBE_CONFIG_B64" ]; then
+            echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to Docker Hub
@@ -120,32 +127,17 @@ jobs:
 
   deploy-to-kubernetes:
     needs: build-and-push-images
-    if: ${{ needs.build-and-push-images.outputs.can_push == 'true' }}
+    if: ${{ needs.build-and-push-images.outputs.can_push == 'true' && needs.build-and-push-images.outputs.has_kubeconfig == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Evaluate deploy prerequisites
-        id: deploy_prereqs
-        env:
-          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
-        run: |
-          if [ -n "$KUBE_CONFIG_B64" ]; then
-            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::KUBE_CONFIG_B64 is not set; skipping deploy."
-            echo "can_deploy=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up kubectl
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         env:
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
@@ -153,11 +145,9 @@ jobs:
           echo "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
 
       - name: Apply manifests
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         run: kubectl apply -k k8s
 
       - name: Update images and rollout
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         env:
           BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
@@ -168,5 +158,4 @@ jobs:
           kubectl -n "$K8S_NAMESPACE" rollout status deployment/datascience-lab-frontend --timeout=180s
 
       - name: Deployment snapshot
-        if: ${{ steps.deploy_prereqs.outputs.can_deploy == 'true' }}
         run: kubectl -n "$K8S_NAMESPACE" get deploy,pods,svc,ingress
