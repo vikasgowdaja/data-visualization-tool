@@ -5,7 +5,6 @@ import ModulePage from '../components/ModulePage'
 import { clearAdminToken, getAdminSession, getAdminToken } from '../services/adminAuth'
 import { getLastStudentUsn, getStudentTaskSnapshot, saveLastStudentUsn, saveStudentTaskSnapshot } from '../services/studentState'
 import {
-  adminResetStudentPassword,
   assignRandomTask,
   changeStudentPassword,
   exportAssignmentsCsv,
