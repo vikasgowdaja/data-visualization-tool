@@ -101,7 +101,7 @@ export default function DashboardPage() {
               const task = getTaskById(assignment.taskId)
               return (
                 <li key={assignment.usn}>
-                  {assignment.name} ({assignment.usn}) -> {task?.id ?? assignment.taskId}: {task?.title ?? 'Task unavailable'}
+                  {assignment.name} ({assignment.usn}) {'->'} {task?.id ?? assignment.taskId}: {task?.title ?? 'Task unavailable'}
                 </li>
               )
             })}

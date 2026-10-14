@@ -171,6 +171,16 @@
   font-weight: 600;
 }
 
+button.button-link {
+  border: 0;
+  cursor: pointer;
+}
+
+button.button-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .button-link.secondary {
   background: var(--surface-2);
   color: var(--text-primary);
@@ -279,6 +289,37 @@
   color: var(--text-primary);
 }
 
+.assignment-form select,
+.mentor-reassign select {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.mentor-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.mentor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.mentor-reassign {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mentor-reassign label {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .assignment-list {
   display: grid;
   gap: 0.7rem;
@@ -332,6 +373,10 @@
   }
 
   .assignment-page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mentor-controls {
     grid-template-columns: 1fr;
   }
 }

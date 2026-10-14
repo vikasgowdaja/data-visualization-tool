@@ -14,7 +14,10 @@ export type StudentAssignment = {
   assignedAt: string
 }
 
+export type AssignmentMode = 'self-assign' | 'mentor-only'
+
 const ASSIGNMENTS_KEY = 'dslab:studentAssignments'
+const ASSIGNMENT_MODE_KEY = 'dslab:assignmentMode'
 
 export const STUDENT_TASKS: StudentTask[] = [
   {
@@ -169,12 +172,30 @@ function saveAssignments(assignments: StudentAssignment[]): void {
   localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments))
 }
 
+function csvEscape(value: string): string {
+  const escaped = value.replace(/"/g, '""')
+  return `"${escaped}"`
+}
+
+export function getAssignmentMode(): AssignmentMode {
+  const stored = localStorage.getItem(ASSIGNMENT_MODE_KEY)
+  return stored === 'mentor-only' ? 'mentor-only' : 'self-assign'
+}
+
+export function setAssignmentMode(mode: AssignmentMode): void {
+  localStorage.setItem(ASSIGNMENT_MODE_KEY, mode)
+}
+
 export function listStudentAssignments(): StudentAssignment[] {
   return loadAssignments().sort((a, b) => a.usn.localeCompare(b.usn))
 }
 
 export function getTaskById(taskId: string): StudentTask | undefined {
   return STUDENT_TASKS.find((task) => task.id === taskId)
+}
+
+export function getTaskOptions(): Array<{ id: string; label: string }> {
+  return STUDENT_TASKS.map((task) => ({ id: task.id, label: `${task.id} - ${task.title}` }))
 }
 
 export function assignRandomTask(name: string, usn: string):
@@ -205,4 +226,50 @@ export function assignRandomTask(name: string, usn: string):
   saveAssignments(assignments)
 
   return { status: 'created', assignment: created }
+}
+
+export function reassignTaskByUsn(usn: string, taskId: string):
+  | { status: 'updated'; assignment: StudentAssignment }
+  | { status: 'not-found' }
+  | { status: 'invalid-task' } {
+  const assignments = loadAssignments()
+  const normalizedUsn = normalizeUsn(usn)
+  const index = assignments.findIndex((entry) => normalizeUsn(entry.usn) === normalizedUsn)
+
+  if (index < 0) {
+    return { status: 'not-found' }
+  }
+
+  const task = getTaskById(taskId)
+  if (!task) {
+    return { status: 'invalid-task' }
+  }
+
+  assignments[index] = {
+    ...assignments[index],
+    taskId: task.id,
+  }
+
+  saveAssignments(assignments)
+  return { status: 'updated', assignment: assignments[index] }
+}
+
+export function exportAssignmentsCsv(): string {
+  const headers = ['Name', 'USN', 'Task ID', 'Task Type', 'Task Title', 'Task Details', 'Assigned At']
+  const rows = listStudentAssignments().map((assignment) => {
+    const task = getTaskById(assignment.taskId)
+    return [
+      assignment.name,
+      assignment.usn,
+      assignment.taskId,
+      task?.type ?? '',
+      task?.title ?? '',
+      task?.details ?? '',
+      assignment.assignedAt,
+    ]
+      .map((value) => csvEscape(String(value)))
+      .join(',')
+  })
+
+  return [headers.map((item) => csvEscape(item)).join(','), ...rows].join('\n')
 }
