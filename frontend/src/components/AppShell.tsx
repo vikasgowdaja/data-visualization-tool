@@ -20,6 +20,7 @@ const pathToLabel: Record<string, string> = {
   '/learn': 'Learn',
   '/datasets': 'Datasets',
   '/data-explorer': 'Data Explorer',
+  '/data-explorer/legacy': 'Legacy Workspace',
   '/data-cleaning-lab': 'Data Cleaning Lab',
   '/visualization-lab': 'Visualization Lab',
   '/statistics-lab': 'Statistics Lab',
@@ -72,6 +73,7 @@ export default function AppShell({ navItems, children }: AppShellProps) {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/data-explorer'}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
             >
