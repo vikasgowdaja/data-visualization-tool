@@ -4,6 +4,7 @@ import ModulePage from '../components/ModulePage'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchProgressSummary, listSessions } from '../services/platform'
 import { getLastDatasetTitle, getLastModule } from '../services/studentState'
+import { getTaskById, listStudentAssignments } from '../services/taskAssignments'
 
 function humanizeModule(pathname: string | null): string {
   if (!pathname) {
@@ -22,6 +23,7 @@ function humanizeModule(pathname: string | null): string {
 export default function DashboardPage() {
   const lastDataset = getLastDatasetTitle()
   const lastModule = humanizeModule(getLastModule())
+  const assignments = listStudentAssignments()
   const recentDatasetsQuery = useQuery({
     queryKey: ['recent-datasets', 'dashboard'],
     queryFn: () => fetchRecentDatasets(6),
@@ -82,7 +84,29 @@ export default function DashboardPage() {
           <Link className="button-link secondary" to="/challenges">
             Start Challenge
           </Link>
+          <Link className="button-link secondary" to="/task-assignment">
+            Open Task Assignment
+          </Link>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Student Assignment Board</h2>
+        <p>Reference list for all assigned students and their random tasks.</p>
+        {assignments.length === 0 ? (
+          <p>No assignments yet. Use Task Assignment page to register students.</p>
+        ) : (
+          <ul className="simple-list">
+            {assignments.map((assignment) => {
+              const task = getTaskById(assignment.taskId)
+              return (
+                <li key={assignment.usn}>
+                  {assignment.name} ({assignment.usn}) -> {task?.id ?? assignment.taskId}: {task?.title ?? 'Task unavailable'}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </section>
     </ModulePage>
   )

@@ -29,6 +29,7 @@ const pathToLabel: Record<string, string> = {
   '/learning-path': 'Learning Path',
   '/resources': 'Resources',
   '/progress': 'Progress',
+  '/task-assignment': 'Task Assignment',
 }
 
 export default function AppShell({ navItems, children }: AppShellProps) {

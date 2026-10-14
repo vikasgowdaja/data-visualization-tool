@@ -19,6 +19,7 @@ const ProjectsPage = lazy(() => import('./pages/ProjectsPage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 const ResourcesPage = lazy(() => import('./pages/ResourcesPage'))
 const ProgressPage = lazy(() => import('./pages/ProgressPage'))
+const TaskAssignmentPage = lazy(() => import('./pages/TaskAssignmentPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const navItems = [
@@ -36,6 +37,7 @@ const navItems = [
   { to: '/learning-path', label: 'Learning Path' },
   { to: '/resources', label: 'Resources' },
   { to: '/progress', label: 'Progress' },
+  { to: '/task-assignment', label: 'Task Assignment' },
 ]
 
 export default function PlatformApp() {
@@ -61,6 +63,7 @@ export default function PlatformApp() {
             <Route path="/learning-path" element={<LearningPathPage />} />
             <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/task-assignment" element={<TaskAssignmentPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
