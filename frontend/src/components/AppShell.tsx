@@ -31,6 +31,7 @@ const pathToLabel: Record<string, string> = {
   '/learning-path': 'Learning Path',
   '/resources': 'Resources',
   '/progress': 'Progress',
+  '/login': 'Login Portal',
   '/student-login': 'Student Login',
   '/task-assignment': 'Task Assignment',
   '/admin-login': 'Admin Login',

@@ -323,6 +323,10 @@ export default function TaskAssignmentPage() {
         setStudentLoginMessage('Student authentication failed. Check your credentials and retry.')
         return
       }
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        setStudentLoginMessage('Task is locked by admin. You cannot change it from student portal.')
+        return
+      }
       setStudentLoginMessage('Could not recover assignment right now.')
     }
   }
@@ -349,68 +353,64 @@ export default function TaskAssignmentPage() {
       nextActionLabel="View Dashboard Assignment Board"
       nextActionTo="/dashboard"
     >
-      <section className="card mentor-controls">
-        <div>
-          <h2>Mentor Controls</h2>
-          <p>
-            Current assignment mode: <strong>{assignmentMode}</strong>
-          </p>
-          <div className="mentor-actions">
-            <button type="button" className="button-link secondary" onClick={handleToggleMode}>
-              {assignmentMode === 'self-assign' ? 'Lock to Mentor-only' : 'Unlock Self-assign'}
-            </button>
-            <button type="button" className="button-link secondary" onClick={handleExportCsv} disabled={!isAdminAuthenticated}>
-              Export Assignment Board CSV
-            </button>
-          </div>
-          {!isAdminAuthenticated && (
+      {isAdminAuthenticated ? (
+        <section className="card mentor-controls">
+          <div>
+            <h2>Mentor Controls</h2>
             <p>
-              Admin features are locked. <Link to="/admin-login">Login as admin</Link> to use mentor controls.
+              Current assignment mode: <strong>{assignmentMode}</strong>
             </p>
-          )}
-        </div>
+            <div className="mentor-actions">
+              <button type="button" className="button-link secondary" onClick={handleToggleMode}>
+                {assignmentMode === 'self-assign' ? 'Lock to Mentor-only' : 'Unlock Self-assign'}
+              </button>
+              <button type="button" className="button-link secondary" onClick={handleExportCsv}>
+                Export Assignment Board CSV
+              </button>
+            </div>
+          </div>
 
-        <div className="mentor-reassign">
-          <h3>Manual Reassign</h3>
-          <label>
-            Student USN
-            <select
-              value={selectedUsnForReassign}
-              onChange={(event) => setSelectedUsnForReassign(event.target.value)}
-              disabled={assignments.length === 0 || !isAdminAuthenticated}
-            >
-              {assignments.map((assignment) => (
-                <option key={assignment.usn} value={assignment.usn}>
-                  {assignment.usn} - {assignment.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            New Task
-            <select
-              value={selectedTaskForReassign}
-              onChange={(event) => setSelectedTaskForReassign(event.target.value)}
-              disabled={!isAdminAuthenticated}
-            >
-              {taskOptions.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="button-link secondary"
-            onClick={handleReassign}
-            disabled={assignments.length === 0 || !isAdminAuthenticated}
-          >
-            Reassign Selected Student
-          </button>
-          {mentorMessage && <p>{mentorMessage}</p>}
-        </div>
-      </section>
+          <div className="mentor-reassign">
+            <h3>Manual Reassign</h3>
+            <label>
+              Student USN
+              <select
+                value={selectedUsnForReassign}
+                onChange={(event) => setSelectedUsnForReassign(event.target.value)}
+                disabled={assignments.length === 0}
+              >
+                {assignments.map((assignment) => (
+                  <option key={assignment.usn} value={assignment.usn}>
+                    {assignment.usn} - {assignment.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              New Task
+              <select value={selectedTaskForReassign} onChange={(event) => setSelectedTaskForReassign(event.target.value)}>
+                {taskOptions.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="button-link secondary" onClick={handleReassign} disabled={assignments.length === 0}>
+              Reassign Selected Student
+            </button>
+            {mentorMessage && <p>{mentorMessage}</p>}
+          </div>
+        </section>
+      ) : (
+        <section className="card">
+          <h2>Admin Work</h2>
+          <p>Admin-only assignment controls are available in the admin portal.</p>
+          <p>
+            Login as admin from <Link to="/login">Common Login</Link> and open Admin Dashboard for management actions.
+          </p>
+        </section>
+      )}
 
       <section className="card assignment-page-grid">
         <div>
@@ -427,12 +427,12 @@ export default function TaskAssignmentPage() {
               />
             </label>
             <label>
-              Password (same as USN)
+              Password
               <input
                 type="password"
                 value={studentLoginPassword}
                 onChange={(event) => setStudentLoginPassword(event.target.value)}
-                placeholder="Enter same USN"
+                placeholder="Enter your password"
               />
             </label>
             <button type="button" className="button-link secondary" onClick={handleStudentLogin}>
@@ -552,20 +552,22 @@ export default function TaskAssignmentPage() {
         </div>
       </section>
 
-      <section className="card">
-        <h2>All Assigned Students</h2>
-        {loadingAssignments ? (
-          <p>Loading assignments...</p>
-        ) : assignments.length === 0 ? (
-          <p>No student has been assigned yet.</p>
-        ) : (
-          <div className="assignment-list">
-            {assignments.map((assignment) => (
-              <AssignmentCard key={assignment.usn} assignment={assignment} task={getTaskById(assignment.taskId)} />
-            ))}
-          </div>
-        )}
-      </section>
+      {isAdminAuthenticated && (
+        <section className="card">
+          <h2>All Assigned Students</h2>
+          {loadingAssignments ? (
+            <p>Loading assignments...</p>
+          ) : assignments.length === 0 ? (
+            <p>No student has been assigned yet.</p>
+          ) : (
+            <div className="assignment-list">
+              {assignments.map((assignment) => (
+                <AssignmentCard key={assignment.usn} assignment={assignment} task={getTaskById(assignment.taskId)} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </ModulePage>
   )
 }
