@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { practiceQuestionBank } from '../features/learningContent'
 import { logProgressEvent } from '../services/platform'
 
@@ -55,7 +56,7 @@ export default function PracticePage() {
       purpose="Practice statistical thinking, chart selection, and interpretation decisions."
       status="available"
       nextActionLabel="Start Challenge"
-      nextActionTo="/challenges"
+      nextActionTo={ROUTES.CHALLENGES}
     >
       <section className="card">
         <div className="form-grid">

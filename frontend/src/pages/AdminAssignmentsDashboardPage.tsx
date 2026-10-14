@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { seedStudentsFromSqlite } from '../services/students'
 import { fetchStudents } from '../services/students'
 import {
@@ -192,7 +193,7 @@ export default function AdminAssignmentsDashboardPage() {
       purpose="View every student assignment, filter records, export CSV, and monitor assignment distribution from one place."
       status="available"
       nextActionLabel="Open Assignment Management"
-      nextActionTo="/task-assignment"
+      nextActionTo={ROUTES.TASK_ASSIGNMENT}
     >
       <section className="card admin-summary-grid">
         <div className="admin-stat-card">
@@ -283,7 +284,7 @@ export default function AdminAssignmentsDashboardPage() {
           >
             {syncMutation.isPending ? 'Syncing...' : 'Sync SQLite to MongoDB'}
           </button>
-          <Link className="button-link secondary" to="/task-assignment">
+          <Link className="button-link secondary" to={ROUTES.TASK_ASSIGNMENT}>
             Manage Assignments
           </Link>
         </div>

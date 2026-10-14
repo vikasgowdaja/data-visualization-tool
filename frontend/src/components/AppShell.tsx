@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { ROUTE_LABELS, ROUTES } from '../constants/routes'
 import { clearAdminToken, getAdminToken } from '../services/adminAuth'
 import { clearStudentSession, getStudentSession } from '../services/studentAuth'
 import { saveLastModule } from '../services/studentState'
@@ -15,28 +16,7 @@ type AppShellProps = {
   children: ReactNode
 }
 
-const pathToLabel: Record<string, string> = {
-  '/': 'Home',
-  '/dashboard': 'Dashboard',
-  '/learn': 'Learn',
-  '/datasets': 'Datasets',
-  '/data-explorer': 'Data Explorer',
-  '/data-cleaning-lab': 'Data Cleaning Lab',
-  '/visualization-lab': 'Visualization Lab',
-  '/statistics-lab': 'Statistics Lab',
-  '/insights-lab': 'Insights Lab',
-  '/practice': 'Practice',
-  '/challenges': 'Challenges',
-  '/projects': 'Projects',
-  '/learning-path': 'Learning Path',
-  '/resources': 'Resources',
-  '/progress': 'Progress',
-  '/login': 'Login Portal',
-  '/student-login': 'Student Login',
-  '/task-assignment': 'Task Assignment',
-  '/admin-login': 'Admin Login',
-  '/admin-assignments': 'Admin Dashboard',
-}
+const pathToLabel: Record<string, string> = ROUTE_LABELS
 
 export default function AppShell({ navItems, children }: AppShellProps) {
   const location = useLocation()
@@ -54,18 +34,18 @@ export default function AppShell({ navItems, children }: AppShellProps) {
   const handleAdminLogout = () => {
     clearAdminToken()
     setHasAdminSession(false)
-    navigate('/admin-login')
+    navigate(ROUTES.ADMIN_LOGIN)
   }
 
   const handleStudentLogout = () => {
     clearStudentSession()
     setStudentUsn('')
-    navigate('/student-login')
+    navigate(ROUTES.STUDENT_LOGIN)
   }
 
   const currentModule = useMemo(() => pathToLabel[location.pathname] ?? 'Module', [location.pathname])
   const breadcrumbs = useMemo(() => {
-    if (location.pathname === '/') {
+    if (location.pathname === ROUTES.HOME) {
       return ['Home']
     }
     return ['Home', currentModule]

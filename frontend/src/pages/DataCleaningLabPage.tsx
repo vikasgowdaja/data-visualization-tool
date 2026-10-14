@@ -2,6 +2,7 @@ import { toNumber } from '../utils/dataMath'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { fetchAllRows, type DataRow } from '../services/explorer'
 import { fetchRecentDatasets } from '../services/datasets'
 import { logProgressEvent } from '../services/platform'
@@ -203,7 +204,7 @@ export default function DataCleaningLabPage() {
       purpose="Experiment with non-destructive cleaning and understand why each operation is performed."
       status="available"
       nextActionLabel="Continue to Visualization Lab"
-      nextActionTo="/visualization-lab"
+      nextActionTo={ROUTES.VISUALIZATION_LAB}
     >
       <section className="card">
         <h3>Load Dataset</h3>

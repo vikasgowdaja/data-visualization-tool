@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { logProgressEvent } from '../services/platform'
 
 const steps = [
@@ -38,7 +39,7 @@ export default function ChallengesPage() {
       purpose="Complete scenario-based analytics from exploration to recommendation."
       status="available"
       nextActionLabel="Open Projects"
-      nextActionTo="/projects"
+      nextActionTo={ROUTES.PROJECTS}
     >
       <section className="card">
         <h3>Scenario: University Student Performance Review</h3>

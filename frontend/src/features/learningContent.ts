@@ -61,21 +61,23 @@ export const learningPathLevels = [
   'Level 8: Applied Data Science',
 ]
 
+import { ROUTES } from '../constants/routes'
+
 export const resourcesCatalog = [
   {
     title: 'Data Quality Checklist',
     description: 'Missing values, duplicates, outliers, and schema sanity checks before analysis.',
-    targetRoute: '/data-cleaning-lab',
+    targetRoute: ROUTES.DATA_CLEANING_LAB,
   },
   {
     title: 'Chart Selection Guide',
     description: 'Map analytical objective to valid visual forms and known pitfalls.',
-    targetRoute: '/visualization-lab',
+    targetRoute: ROUTES.VISUALIZATION_LAB,
   },
   {
     title: 'Interpretation Framework',
     description: 'Use DIKW and avoid correlation-causation fallacies.',
-    targetRoute: '/insights-lab',
+    targetRoute: ROUTES.INSIGHTS_LAB,
   },
 ]
 

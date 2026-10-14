@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ROUTES } from '../constants/routes'
 
 export default function LandingPage() {
   return (
@@ -11,10 +12,10 @@ export default function LandingPage() {
           through hands-on practice.
         </p>
         <div className="hero-actions">
-          <Link className="button-link" to="/learn">
+          <Link className="button-link" to={ROUTES.LEARN}>
             Start Learning
           </Link>
-          <Link className="button-link secondary" to="/datasets">
+          <Link className="button-link secondary" to={ROUTES.DATASETS}>
             Explore Datasets
           </Link>
         </div>

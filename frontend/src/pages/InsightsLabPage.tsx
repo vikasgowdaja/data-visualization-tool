@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { jsPDF } from 'jspdf'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { logProgressEvent } from '../services/platform'
 
 type Aspect = 'trend' | 'strength' | 'evidence' | 'exceptions' | 'outliers' | 'stat_language' | 'causation' | 'clarity'
@@ -122,7 +123,7 @@ export default function InsightsLabPage() {
       purpose="Move from data observations to information, context, wisdom, and decision-ready insights."
       status="available"
       nextActionLabel="Practice Questions"
-      nextActionTo="/practice"
+      nextActionTo={ROUTES.PRACTICE}
     >
       <section className="card">
         <h3>DIKW Reflection Flow</h3>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { ROUTES } from '../constants/routes'
 import { clearAdminToken, getAdminSession, getAdminToken } from '../services/adminAuth'
 
 type RequireAdminRouteProps = {
@@ -17,7 +18,7 @@ export default function RequireAdminRoute({ children }: RequireAdminRouteProps) 
   })
 
   if (!token) {
-    return <Navigate to="/admin-login" replace />
+    return <Navigate to={ROUTES.ADMIN_LOGIN} replace />
   }
 
   if (sessionQuery.isLoading) {
@@ -26,7 +27,7 @@ export default function RequireAdminRoute({ children }: RequireAdminRouteProps) 
 
   if (sessionQuery.isError || !sessionQuery.data?.isAdmin) {
     clearAdminToken()
-    return <Navigate to="/admin-login" replace />
+    return <Navigate to={ROUTES.ADMIN_LOGIN} replace />
   }
 
   return <>{children}</>

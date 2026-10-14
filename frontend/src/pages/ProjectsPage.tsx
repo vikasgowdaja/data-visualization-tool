@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { projectTemplates } from '../features/learningContent'
 import { createSession } from '../services/platform'
 
@@ -32,7 +33,7 @@ export default function ProjectsPage() {
       purpose="Complete mini-project workflows from problem framing to reflection."
       status="available"
       nextActionLabel="Learning Path"
-      nextActionTo="/learning-path"
+      nextActionTo={ROUTES.LEARNING_PATH}
     >
       <section className="card">
         <label>

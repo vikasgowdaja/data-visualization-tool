@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchVersions } from '../services/platform'
 import { PROJECTS } from '../services/projects'
@@ -54,7 +55,7 @@ export default function DatasetsPage() {
       purpose="Choose project datasets with context and learning objective alignment."
       status="in-progress"
       nextActionLabel="Generate and Explore Dataset"
-      nextActionTo="/data-explorer"
+      nextActionTo={ROUTES.DATA_EXPLORER}
     >
       <section className="card">
         <label className="search-field">
@@ -80,7 +81,7 @@ export default function DatasetsPage() {
             <p>Recent generated versions: {byName.get(project.id)?.count ?? 0}</p>
             <p>Latest rows: {byName.get(project.id)?.rows ?? 0}</p>
             <p>Latest columns: {byName.get(project.id)?.columns ?? 0}</p>
-            <Link className="text-link" to="/data-explorer">
+            <Link className="text-link" to={ROUTES.DATA_EXPLORER}>
               Open in Data Explorer
             </Link>
           </article>

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import '../App.css'
 import { PROJECTS } from '../services/projects'
 import {
@@ -204,7 +205,7 @@ export default function DataExplorerPage() {
       purpose="Inspect dataset structure, quality issues, and descriptive patterns using server-side pagination and filters."
       status="available"
       nextActionLabel="Open Legacy Analysis Workspace"
-      nextActionTo="/data-explorer/legacy"
+      nextActionTo={ROUTES.DATA_EXPLORER_LEGACY}
     >
       <section className="card">
         <h2>Dataset Generator 2.0 (Phase 3 Baseline)</h2>
@@ -690,7 +691,7 @@ export default function DataExplorerPage() {
               The complete current workflow remains available in the legacy explorer while Phase 5 upgrades are in
               progress.
             </p>
-            <Link className="button-link" to="/data-explorer/legacy">
+            <Link className="button-link" to={ROUTES.DATA_EXPLORER_LEGACY}>
               Open Legacy Workspace
             </Link>
           </section>
