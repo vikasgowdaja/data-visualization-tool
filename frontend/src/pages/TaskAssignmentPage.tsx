@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { clearAdminToken, getAdminSession, getAdminToken } from '../services/adminAuth'
 import { saveLastStudentUsn } from '../services/studentState'
 import {
   assignRandomTask,
@@ -53,6 +56,7 @@ export default function TaskAssignmentPage() {
   const [selectedTaskForReassign, setSelectedTaskForReassign] = useState('S01')
   const [assignments, setAssignments] = useState<StudentAssignment[]>([])
   const [loadingAssignments, setLoadingAssignments] = useState(true)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
 
   const taskOptions = useMemo(() => getTaskOptions(), [])
 
@@ -85,6 +89,43 @@ export default function TaskAssignmentPage() {
   }, [])
 
   useEffect(() => {
+    let mounted = true
+    const validateAdminSession = async () => {
+      if (!getAdminToken()) {
+        if (mounted) {
+          setIsAdminAuthenticated(false)
+        }
+        return
+      }
+      try {
+        const session = await getAdminSession()
+        if (mounted) {
+          setIsAdminAuthenticated(session.isAdmin)
+        }
+      } catch {
+        clearAdminToken()
+        if (mounted) {
+          setIsAdminAuthenticated(false)
+        }
+      }
+    }
+    void validateAdminSession()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const handleAdminError = (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearAdminToken()
+      setIsAdminAuthenticated(false)
+      setMentorMessage('Admin login required. Please log in again.')
+      return
+    }
+    throw error
+  }
+
+  useEffect(() => {
     if (!selectedUsnForReassign && assignments.length > 0) {
       setSelectedUsnForReassign(assignments[0].usn)
     }
@@ -115,19 +156,40 @@ export default function TaskAssignmentPage() {
   }
 
   const handleToggleMode = async () => {
+    if (!isAdminAuthenticated) {
+      setMentorMessage('Admin login required to change assignment mode.')
+      return
+    }
     const nextMode: AssignmentMode = assignmentMode === 'self-assign' ? 'mentor-only' : 'self-assign'
-    const mode = await setAssignmentMode(nextMode)
-    setAssignmentModeState(mode)
-    setMentorMessage(`Assignment mode switched to ${mode}.`)
+    try {
+      const mode = await setAssignmentMode(nextMode)
+      setAssignmentModeState(mode)
+      setMentorMessage(`Assignment mode switched to ${mode}.`)
+    } catch (error) {
+      handleAdminError(error)
+    }
   }
 
   const handleReassign = async () => {
+    if (!isAdminAuthenticated) {
+      setMentorMessage('Admin login required to reassign tasks.')
+      return
+    }
     if (!selectedUsnForReassign) {
       setMentorMessage('Select a student USN to reassign.')
       return
     }
 
-    const result = await reassignTaskByUsn(selectedUsnForReassign, selectedTaskForReassign)
+    let result:
+      | { status: 'updated'; assignment: StudentAssignment }
+      | { status: 'not-found' }
+      | { status: 'invalid-task' }
+    try {
+      result = await reassignTaskByUsn(selectedUsnForReassign, selectedTaskForReassign)
+    } catch (error) {
+      handleAdminError(error)
+      return
+    }
     if (result.status === 'not-found') {
       setMentorMessage('Selected USN was not found in assignment records.')
       return
@@ -175,10 +237,15 @@ export default function TaskAssignmentPage() {
             <button type="button" className="button-link secondary" onClick={handleToggleMode}>
               {assignmentMode === 'self-assign' ? 'Lock to Mentor-only' : 'Unlock Self-assign'}
             </button>
-            <button type="button" className="button-link secondary" onClick={handleExportCsv}>
+            <button type="button" className="button-link secondary" onClick={handleExportCsv} disabled={!isAdminAuthenticated}>
               Export Assignment Board CSV
             </button>
           </div>
+          {!isAdminAuthenticated && (
+            <p>
+              Admin features are locked. <Link to="/admin-login">Login as admin</Link> to use mentor controls.
+            </p>
+          )}
         </div>
 
         <div className="mentor-reassign">
@@ -188,7 +255,7 @@ export default function TaskAssignmentPage() {
             <select
               value={selectedUsnForReassign}
               onChange={(event) => setSelectedUsnForReassign(event.target.value)}
-              disabled={assignments.length === 0}
+              disabled={assignments.length === 0 || !isAdminAuthenticated}
             >
               {assignments.map((assignment) => (
                 <option key={assignment.usn} value={assignment.usn}>
@@ -199,7 +266,11 @@ export default function TaskAssignmentPage() {
           </label>
           <label>
             New Task
-            <select value={selectedTaskForReassign} onChange={(event) => setSelectedTaskForReassign(event.target.value)}>
+            <select
+              value={selectedTaskForReassign}
+              onChange={(event) => setSelectedTaskForReassign(event.target.value)}
+              disabled={!isAdminAuthenticated}
+            >
               {taskOptions.map((task) => (
                 <option key={task.id} value={task.id}>
                   {task.label}
@@ -207,7 +278,12 @@ export default function TaskAssignmentPage() {
               ))}
             </select>
           </label>
-          <button type="button" className="button-link secondary" onClick={handleReassign} disabled={assignments.length === 0}>
+          <button
+            type="button"
+            className="button-link secondary"
+            onClick={handleReassign}
+            disabled={assignments.length === 0 || !isAdminAuthenticated}
+          >
             Reassign Selected Student
           </button>
           {mentorMessage && <p>{mentorMessage}</p>}

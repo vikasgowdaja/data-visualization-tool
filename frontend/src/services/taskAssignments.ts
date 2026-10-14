@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE } from './api'
+import { getAdminAuthHeaders } from './adminAuth'
 
 export type StudentTaskType = 'feature' | 'refactor' | 'bug' | 'devops-docs'
 
@@ -197,7 +198,11 @@ export async function getAssignmentMode(): Promise<AssignmentMode> {
 }
 
 export async function setAssignmentMode(mode: AssignmentMode): Promise<AssignmentMode> {
-  const response = await axios.put<AssignmentModeApiResponse>(`${API_BASE}/assignments/mode`, { mode })
+  const response = await axios.put<AssignmentModeApiResponse>(
+    `${API_BASE}/assignments/mode`,
+    { mode },
+    { headers: getAdminAuthHeaders() },
+  )
   return response.data.mode
 }
 
@@ -223,6 +228,8 @@ export async function reassignTaskByUsn(
   try {
     const response = await axios.put<AssignmentApiResponse>(`${API_BASE}/assignments/${encodeURIComponent(usn)}/task`, {
       task_id: taskId,
+    }, {
+      headers: getAdminAuthHeaders(),
     })
     return {
       status: 'updated',

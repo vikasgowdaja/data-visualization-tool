@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE } from './api'
+import { getAdminAuthHeaders } from './adminAuth'
 
 export type StudentRecord = {
   name: string
@@ -24,6 +25,8 @@ export async function fetchStudentByUsn(usn: string): Promise<StudentRecord> {
 }
 
 export async function seedStudentsFromSqlite(): Promise<SeedStudentsResult> {
-  const response = await axios.post<SeedStudentsResult>(`${API_BASE}/students/seed-from-sqlite`)
+  const response = await axios.post<SeedStudentsResult>(`${API_BASE}/students/seed-from-sqlite`, undefined, {
+    headers: getAdminAuthHeaders(),
+  })
   return response.data
 }

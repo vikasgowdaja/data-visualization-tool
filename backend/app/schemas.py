@@ -148,6 +148,22 @@ class AssignmentModeUpdateRequest(BaseModel):
     mode: Literal["self-assign", "mentor-only"]
 
 
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=120)
+
+
+class AdminLoginResponse(BaseModel):
+    token: str
+    expires_at: str
+
+
+class AdminSessionResponse(BaseModel):
+    username: str
+    is_admin: bool
+    expires_at: str
+
+
 class StudentRecordResponse(BaseModel):
     name: str
     usn: str

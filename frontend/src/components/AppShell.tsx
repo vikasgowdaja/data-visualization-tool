@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { clearAdminToken, getAdminToken } from '../services/adminAuth'
 import { saveLastModule } from '../services/studentState'
 
 type NavItem = {
@@ -30,16 +31,26 @@ const pathToLabel: Record<string, string> = {
   '/resources': 'Resources',
   '/progress': 'Progress',
   '/task-assignment': 'Task Assignment',
+  '/admin-login': 'Admin Login',
   '/admin-assignments': 'Admin Dashboard',
 }
 
 export default function AppShell({ navItems, children }: AppShellProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [hasAdminSession, setHasAdminSession] = useState(getAdminToken().length > 0)
 
   useEffect(() => {
     saveLastModule(location.pathname)
+    setHasAdminSession(getAdminToken().length > 0)
   }, [location.pathname])
+
+  const handleAdminLogout = () => {
+    clearAdminToken()
+    setHasAdminSession(false)
+    navigate('/admin-login')
+  }
 
   const currentModule = useMemo(() => pathToLabel[location.pathname] ?? 'Module', [location.pathname])
   const breadcrumbs = useMemo(() => {
@@ -84,6 +95,11 @@ export default function AppShell({ navItems, children }: AppShellProps) {
             <p className="breadcrumbs">{breadcrumbs.join(' / ')}</p>
             <h1 className="module-indicator">{currentModule}</h1>
           </div>
+          {hasAdminSession && (
+            <button type="button" className="button-link secondary" onClick={handleAdminLogout}>
+              Admin Logout
+            </button>
+          )}
         </header>
         <main className="main-content">{children}</main>
       </div>

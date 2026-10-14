@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import hmac
 import io
 import json
 import logging
@@ -9,10 +11,12 @@ import random
 import re
 import statistics
 import time
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
@@ -30,7 +34,16 @@ from .assignment_store import (
     update_student_assignment_task_mongo,
 )
 
-from .config import CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS, FRONTEND_DIST_DIR, GENERATED_DIR
+from .config import (
+    ADMIN_PASSWORD,
+    ADMIN_TOKEN_SECRET,
+    ADMIN_TOKEN_TTL_HOURS,
+    ADMIN_USERNAME,
+    CORS_ALLOW_CREDENTIALS,
+    CORS_ALLOW_ORIGINS,
+    FRONTEND_DIST_DIR,
+    GENERATED_DIR,
+)
 from .dataset_generator import (
     generate_dataset as generate_dataset_bundle,
     get_dataset_template,
@@ -56,6 +69,9 @@ from .db import (
 )
 
 from .schemas import (
+    AdminLoginRequest,
+    AdminLoginResponse,
+    AdminSessionResponse,
     AssignmentModeResponse,
     AssignmentModeUpdateRequest,
     DatasetGenerateRequest,
@@ -345,6 +361,76 @@ def _raise_assignment_backend_unavailable(exc: Exception) -> None:
     raise HTTPException(status_code=503, detail=f"Assignment backend unavailable: {exc}") from exc
 
 
+def _encode_admin_token(username: str, expires_at: datetime) -> str:
+    payload = f"{username}|{int(expires_at.timestamp())}"
+    digest = hmac.new(ADMIN_TOKEN_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    token_text = f"{payload}|{digest}"
+    return urlsafe_b64encode(token_text.encode("utf-8")).decode("utf-8")
+
+
+def _decode_admin_token(token: str) -> tuple[str, datetime]:
+    try:
+        raw = urlsafe_b64decode(token.encode("utf-8")).decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token") from exc
+
+    parts = raw.split("|")
+    if len(parts) != 3:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
+    username, expires_at_raw, signature = parts
+    payload = f"{username}|{expires_at_raw}"
+    expected_signature = hmac.new(
+        ADMIN_TOKEN_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
+    try:
+        expires_at_timestamp = int(expires_at_raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token") from exc
+
+    expires_at = datetime.fromtimestamp(expires_at_timestamp, tz=timezone.utc)
+    if datetime.now(tz=timezone.utc) >= expires_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin token expired")
+
+    if username != ADMIN_USERNAME:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
+    return username, expires_at
+
+
+def require_admin_user(authorization: str | None = Header(default=None)) -> str:
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing admin authorization")
+    token_prefix = "Bearer "
+    if not authorization.startswith(token_prefix):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization scheme")
+    token = authorization[len(token_prefix) :].strip()
+    username, _ = _decode_admin_token(token)
+    return username
+
+
+@app.post("/api/admin/login", response_model=AdminLoginResponse)
+def admin_login(payload: AdminLoginRequest) -> AdminLoginResponse:
+    if payload.username.strip() != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin credentials")
+
+    expires_at = datetime.now(tz=timezone.utc) + timedelta(hours=ADMIN_TOKEN_TTL_HOURS)
+    token = _encode_admin_token(ADMIN_USERNAME, expires_at)
+    return AdminLoginResponse(token=token, expires_at=expires_at.isoformat())
+
+
+@app.get("/api/admin/me", response_model=AdminSessionResponse)
+def admin_me(authorization: str | None = Header(default=None)) -> AdminSessionResponse:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing admin authorization")
+    token = authorization[len("Bearer ") :].strip()
+    username, expires_at = _decode_admin_token(token)
+    return AdminSessionResponse(username=username, is_admin=True, expires_at=expires_at.isoformat())
+
+
 def _to_student_record_response(row) -> StudentRecordResponse:
     return StudentRecordResponse(
         name=row["name"],
@@ -376,7 +462,7 @@ def get_assignments_mode() -> AssignmentModeResponse:
 
 
 @app.put("/api/assignments/mode", response_model=AssignmentModeResponse)
-def update_assignments_mode(payload: AssignmentModeUpdateRequest) -> AssignmentModeResponse:
+def update_assignments_mode(payload: AssignmentModeUpdateRequest, _admin: str = Depends(require_admin_user)) -> AssignmentModeResponse:
     try:
         set_assignment_mode_mongo(payload.mode)
     except RuntimeError as exc:
@@ -405,7 +491,9 @@ def create_random_assignment(payload: StudentAssignRequest) -> StudentAssignResu
 
 
 @app.put("/api/assignments/{usn}/task", response_model=StudentAssignmentResponse)
-def reassign_student_task(usn: str, payload: StudentReassignRequest) -> StudentAssignmentResponse:
+def reassign_student_task(
+    usn: str, payload: StudentReassignRequest, _admin: str = Depends(require_admin_user)
+) -> StudentAssignmentResponse:
     normalized_usn = _normalize_usn(usn)
     task_id = payload.task_id.strip().upper()
     if task_id not in _student_task_ids:
@@ -442,7 +530,7 @@ def get_student(usn: str) -> StudentRecordResponse:
 
 
 @app.post("/api/students/seed-from-sqlite", response_model=SeedStudentsResponse)
-def seed_students_from_sqlite() -> SeedStudentsResponse:
+def seed_students_from_sqlite(_admin: str = Depends(require_admin_user)) -> SeedStudentsResponse:
     sqlite_rows = list_student_assignments()
     rows = [
         {

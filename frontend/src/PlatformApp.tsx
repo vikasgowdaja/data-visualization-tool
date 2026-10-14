@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell'
+import RequireAdminRoute from './components/RequireAdminRoute'
 import './shell.css'
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -21,6 +22,7 @@ const ResourcesPage = lazy(() => import('./pages/ResourcesPage'))
 const ProgressPage = lazy(() => import('./pages/ProgressPage'))
 const TaskAssignmentPage = lazy(() => import('./pages/TaskAssignmentPage'))
 const AdminAssignmentsDashboardPage = lazy(() => import('./pages/AdminAssignmentsDashboardPage'))
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const navItems = [
@@ -39,6 +41,7 @@ const navItems = [
   { to: '/resources', label: 'Resources' },
   { to: '/progress', label: 'Progress' },
   { to: '/task-assignment', label: 'Task Assignment' },
+  { to: '/admin-login', label: 'Admin Login' },
   { to: '/admin-assignments', label: 'Admin Dashboard' },
 ]
 
@@ -66,7 +69,15 @@ export default function PlatformApp() {
             <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/task-assignment" element={<TaskAssignmentPage />} />
-            <Route path="/admin-assignments" element={<AdminAssignmentsDashboardPage />} />
+            <Route path="/admin-login" element={<AdminLoginPage />} />
+            <Route
+              path="/admin-assignments"
+              element={
+                <RequireAdminRoute>
+                  <AdminAssignmentsDashboardPage />
+                </RequireAdminRoute>
+              }
+            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

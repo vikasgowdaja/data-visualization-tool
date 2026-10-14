@@ -40,5 +40,10 @@ MONGODB_ASSIGNMENTS_COLLECTION = os.getenv("MONGODB_ASSIGNMENTS_COLLECTION", "st
 MONGODB_SETTINGS_COLLECTION = os.getenv("MONGODB_SETTINGS_COLLECTION", "assignment_settings").strip() or "assignment_settings"
 MONGODB_STUDENTS_COLLECTION = os.getenv("MONGODB_STUDENTS_COLLECTION", "students").strip() or "students"
 
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip() or "admin"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123").strip() or "admin123"
+ADMIN_TOKEN_SECRET = os.getenv("ADMIN_TOKEN_SECRET", "change-me-admin-token-secret").strip() or "change-me-admin-token-secret"
+ADMIN_TOKEN_TTL_HOURS = max(1, int(os.getenv("ADMIN_TOKEN_TTL_HOURS", "8")))
+
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
