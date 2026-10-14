@@ -298,6 +298,39 @@ button.button-link:disabled {
   color: var(--text-primary);
 }
 
+.task-recovery-wrap {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.task-recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.task-recovery-button {
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+}
+
+.task-recovery-button.recovered {
+  border-color: #166534;
+  background: #eaf8ef;
+}
+
+.task-recovery-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .mentor-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;

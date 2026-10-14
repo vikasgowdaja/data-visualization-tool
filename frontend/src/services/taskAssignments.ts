@@ -36,6 +36,48 @@ type AssignRandomApiResponse = {
   assignment: AssignmentApiResponse
 }
 
+type StudentLoginApiResponse = {
+  usn: string
+  assignment_found: boolean
+  assignment: AssignmentApiResponse | null
+  recovered_task_id: string | null
+  must_change_password: boolean
+  profile_name: string | null
+  message: string
+}
+
+type StudentRecoverAssignmentApiResponse = {
+  status: 'saved' | 'matched-cache'
+  matched_cached_task: boolean
+  assignment: AssignmentApiResponse
+}
+
+export type StudentLoginResult = {
+  usn: string
+  assignmentFound: boolean
+  assignment: StudentAssignment | null
+  recoveredTaskId: string | null
+  mustChangePassword: boolean
+  profileName: string | null
+  message: string
+}
+
+export type StudentRecoveryResult = {
+  status: 'saved' | 'matched-cache'
+  matchedCachedTask: boolean
+  assignment: StudentAssignment
+}
+
+export type StudentPasswordChangeResult = {
+  usn: string
+  passwordChanged: boolean
+}
+
+export type AdminResetStudentPasswordResult = {
+  usn: string
+  resetToDefault: boolean
+}
+
 export const STUDENT_TASKS: StudentTask[] = [
   {
     id: 'S01',
@@ -214,6 +256,78 @@ export async function assignRandomTask(name: string, usn: string): Promise<
   return {
     status: response.data.status,
     assignment: toAssignment(response.data.assignment),
+  }
+}
+
+export async function loginStudentByUsn(
+  username: string,
+  password: string,
+  cachedTaskId?: string,
+): Promise<StudentLoginResult> {
+  const response = await axios.post<StudentLoginApiResponse>(`${API_BASE}/students/login`, {
+    username,
+    password,
+    cached_task_id: cachedTaskId || null,
+  })
+  return {
+    usn: response.data.usn,
+    assignmentFound: response.data.assignment_found,
+    assignment: response.data.assignment ? toAssignment(response.data.assignment) : null,
+    recoveredTaskId: response.data.recovered_task_id,
+    mustChangePassword: response.data.must_change_password,
+    profileName: response.data.profile_name,
+    message: response.data.message,
+  }
+}
+
+export async function recoverStudentAssignment(
+  username: string,
+  password: string,
+  taskId: string,
+  name?: string,
+  cachedTaskId?: string,
+): Promise<StudentRecoveryResult> {
+  const response = await axios.post<StudentRecoverAssignmentApiResponse>(`${API_BASE}/students/recover-assignment`, {
+    username,
+    password,
+    task_id: taskId,
+    name: name || null,
+    cached_task_id: cachedTaskId || null,
+  })
+  return {
+    status: response.data.status,
+    matchedCachedTask: response.data.matched_cached_task,
+    assignment: toAssignment(response.data.assignment),
+  }
+}
+
+export async function changeStudentPassword(
+  usn: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<StudentPasswordChangeResult> {
+  const response = await axios.post<{ usn: string; password_changed: boolean }>(`${API_BASE}/students/change-password`, {
+    usn,
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+  return {
+    usn: response.data.usn,
+    passwordChanged: response.data.password_changed,
+  }
+}
+
+export async function adminResetStudentPassword(usn: string): Promise<AdminResetStudentPasswordResult> {
+  const response = await axios.post<{ usn: string; reset_to_default: boolean }>(
+    `${API_BASE}/students/${encodeURIComponent(usn)}/reset-password`,
+    undefined,
+    {
+      headers: getAdminAuthHeaders(),
+    },
+  )
+  return {
+    usn: response.data.usn,
+    resetToDefault: response.data.reset_to_default,
   }
 }
 

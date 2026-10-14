@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import { seedStudentsFromSqlite } from '../services/students'
 import {
+  adminResetStudentPassword,
   exportAssignmentsCsv,
   getAssignmentMode,
   getTaskById,
@@ -37,6 +38,8 @@ export default function AdminAssignmentsDashboardPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | StudentTaskType>('all')
   const [taskFilter, setTaskFilter] = useState<'all' | string>('all')
   const [syncMessage, setSyncMessage] = useState('')
+  const [resetUsn, setResetUsn] = useState('')
+  const [resetMessage, setResetMessage] = useState('')
   const queryClient = useQueryClient()
   const assignmentsQuery = useQuery({
     queryKey: ['student-assignments', 'admin-dashboard'],
@@ -61,6 +64,16 @@ export default function AdminAssignmentsDashboardPage() {
     },
     onError: () => {
       setSyncMessage('Sync failed. Ensure admin session is valid and backend can access both databases.')
+    },
+  })
+  const resetPasswordMutation = useMutation({
+    mutationFn: adminResetStudentPassword,
+    onSuccess: (result) => {
+      setResetMessage(`Password reset to default for ${result.usn}. Student must login with USN/USN and change it.`)
+      setResetUsn('')
+    },
+    onError: () => {
+      setResetMessage('Could not reset password. Verify USN and admin session.')
     },
   })
 
@@ -230,6 +243,29 @@ export default function AdminAssignmentsDashboardPage() {
           </Link>
         </div>
         {syncMessage && <p>{syncMessage}</p>}
+        <div className="assignment-form" style={{ marginTop: '0.75rem' }}>
+          <label>
+            Reset Student Password (USN)
+            <input
+              type="text"
+              value={resetUsn}
+              onChange={(event) => setResetUsn(event.target.value)}
+              placeholder="Enter student USN"
+            />
+          </label>
+          <button
+            type="button"
+            className="button-link secondary"
+            disabled={resetPasswordMutation.isPending || !resetUsn.trim()}
+            onClick={() => {
+              setResetMessage('')
+              resetPasswordMutation.mutate(resetUsn.trim().toUpperCase())
+            }}
+          >
+            {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password to Default'}
+          </button>
+          {resetMessage && <p>{resetMessage}</p>}
+        </div>
       </section>
 
       <section className="card">

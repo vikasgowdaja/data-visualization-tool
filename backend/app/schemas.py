@@ -136,6 +136,52 @@ class StudentAssignResult(BaseModel):
     assignment: StudentAssignmentResponse
 
 
+class StudentLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=60)
+    password: str = Field(min_length=1, max_length=60)
+    cached_task_id: str | None = Field(default=None, max_length=20)
+
+
+class StudentLoginResponse(BaseModel):
+    usn: str
+    assignment_found: bool
+    assignment: StudentAssignmentResponse | None = None
+    recovered_task_id: str | None = None
+    must_change_password: bool = False
+    profile_name: str | None = None
+    message: str
+
+
+class StudentRecoverAssignmentRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=60)
+    password: str = Field(min_length=1, max_length=60)
+    task_id: str = Field(min_length=1, max_length=20)
+    name: str | None = Field(default=None, max_length=120)
+    cached_task_id: str | None = Field(default=None, max_length=20)
+
+
+class StudentRecoverAssignmentResponse(BaseModel):
+    status: Literal["saved", "matched-cache"]
+    matched_cached_task: bool
+    assignment: StudentAssignmentResponse
+
+
+class StudentChangePasswordRequest(BaseModel):
+    usn: str = Field(min_length=1, max_length=60)
+    current_password: str = Field(min_length=1, max_length=120)
+    new_password: str = Field(min_length=6, max_length=120)
+
+
+class StudentChangePasswordResponse(BaseModel):
+    usn: str
+    password_changed: bool
+
+
+class AdminResetStudentPasswordResponse(BaseModel):
+    usn: str
+    reset_to_default: bool
+
+
 class StudentReassignRequest(BaseModel):
     task_id: str = Field(min_length=1, max_length=20)
 

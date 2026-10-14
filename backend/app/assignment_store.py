@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
@@ -14,6 +16,7 @@ from .config import (
     MONGODB_SETTINGS_COLLECTION,
     MONGODB_STUDENTS_COLLECTION,
     MONGODB_URI,
+    STUDENT_PASSWORD_SECRET,
 )
 
 
@@ -99,10 +102,31 @@ def _normalize_student(doc: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _hash_student_password(usn: str, password: str) -> str:
+    raw = f"{STUDENT_PASSWORD_SECRET}|{usn.strip().upper()}|{password}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _default_student_password(usn: str) -> str:
+    return usn.strip().upper()
+
+
+def _normalize_student_auth(doc: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": str(doc.get("name", "")),
+        "usn": str(doc.get("usn", "")),
+        "task_id": str(doc.get("task_id", "")),
+        "assigned_at": str(doc.get("assigned_at", "")),
+        "password_hash": str(doc.get("password_hash", "")),
+        "password_must_change": bool(doc.get("password_must_change", True)),
+    }
+
+
 def upsert_student_record_mongo(name: str, usn: str, task_id: str, assigned_at: str) -> dict[str, str]:
     now = datetime.now(tz=timezone.utc).isoformat()
+    normalized_usn = usn.strip().upper()
     doc = _students_collection().find_one_and_update(
-        {"usn": usn},
+        {"usn": normalized_usn},
         {
             "$set": {
                 "name": name,
@@ -112,6 +136,8 @@ def upsert_student_record_mongo(name: str, usn: str, task_id: str, assigned_at: 
             },
             "$setOnInsert": {
                 "created_at": now,
+                "password_hash": _hash_student_password(normalized_usn, _default_student_password(normalized_usn)),
+                "password_must_change": True,
             },
         },
         upsert=True,
@@ -121,6 +147,60 @@ def upsert_student_record_mongo(name: str, usn: str, task_id: str, assigned_at: 
     if doc is None:
         raise RuntimeError("Failed to upsert student record")
     return _normalize_student(doc)
+
+
+def get_student_auth_record_mongo(usn: str) -> dict[str, Any] | None:
+    normalized_usn = usn.strip().upper()
+    doc = _students_collection().find_one(
+        {"usn": normalized_usn},
+        {
+            "_id": 0,
+            "name": 1,
+            "usn": 1,
+            "task_id": 1,
+            "assigned_at": 1,
+            "password_hash": 1,
+            "password_must_change": 1,
+        },
+    )
+    if doc is None:
+        return None
+    return _normalize_student_auth(doc)
+
+
+def verify_student_password_mongo(usn: str, password: str) -> tuple[bool, bool]:
+    record = get_student_auth_record_mongo(usn)
+    normalized_usn = usn.strip().upper()
+    if record is None:
+        return (password.strip().upper() == _default_student_password(normalized_usn), True)
+
+    expected_hash = str(record.get("password_hash", ""))
+    if not expected_hash:
+        expected_hash = _hash_student_password(normalized_usn, _default_student_password(normalized_usn))
+    supplied_hash = _hash_student_password(normalized_usn, password)
+    is_valid = hmac.compare_digest(expected_hash, supplied_hash)
+    must_change = bool(record.get("password_must_change", True))
+    return (is_valid, must_change)
+
+
+def set_student_password_mongo(usn: str, new_password: str, force_must_change: bool = False) -> bool:
+    normalized_usn = usn.strip().upper()
+    result = _students_collection().update_one(
+        {"usn": normalized_usn},
+        {
+            "$set": {
+                "password_hash": _hash_student_password(normalized_usn, new_password),
+                "password_must_change": force_must_change,
+                "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+            }
+        },
+    )
+    return result.matched_count > 0
+
+
+def reset_student_password_to_default_mongo(usn: str) -> bool:
+    normalized_usn = usn.strip().upper()
+    return set_student_password_mongo(normalized_usn, _default_student_password(normalized_usn), force_must_change=True)
 
 
 def list_students_mongo() -> list[dict[str, str]]:

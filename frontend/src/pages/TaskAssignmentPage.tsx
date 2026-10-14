@@ -3,14 +3,18 @@ import axios from 'axios'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import { clearAdminToken, getAdminSession, getAdminToken } from '../services/adminAuth'
-import { saveLastStudentUsn } from '../services/studentState'
+import { getLastStudentUsn, getStudentTaskSnapshot, saveLastStudentUsn, saveStudentTaskSnapshot } from '../services/studentState'
 import {
+  adminResetStudentPassword,
   assignRandomTask,
+  changeStudentPassword,
   exportAssignmentsCsv,
   getAssignmentMode,
   getTaskById,
   getTaskOptions,
   listStudentAssignments,
+  loginStudentByUsn,
+  recoverStudentAssignment,
   reassignTaskByUsn,
   setAssignmentMode,
   type AssignmentMode,
@@ -57,6 +61,17 @@ export default function TaskAssignmentPage() {
   const [assignments, setAssignments] = useState<StudentAssignment[]>([])
   const [loadingAssignments, setLoadingAssignments] = useState(true)
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
+  const [studentLoginUsn, setStudentLoginUsn] = useState(getLastStudentUsn())
+  const [studentLoginPassword, setStudentLoginPassword] = useState('')
+  const [studentLoggedInUsn, setStudentLoggedInUsn] = useState('')
+  const [studentRecoveryTask, setStudentRecoveryTask] = useState('S01')
+  const [cachedRecoveredTask, setCachedRecoveredTask] = useState('')
+  const [studentLoginMessage, setStudentLoginMessage] = useState('Login with USN as username and password to verify/recover your assignment.')
+  const [showRecoveryChooser, setShowRecoveryChooser] = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [studentProfileName, setStudentProfileName] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
 
   const taskOptions = useMemo(() => getTaskOptions(), [])
 
@@ -144,6 +159,7 @@ export default function TaskAssignmentPage() {
 
     const result = await assignRandomTask(name, usn)
     saveLastStudentUsn(result.assignment.usn)
+    saveStudentTaskSnapshot(result.assignment.usn, result.assignment.taskId)
     setLatestAssignment(result.assignment)
 
     if (result.status === 'duplicate') {
@@ -201,8 +217,115 @@ export default function TaskAssignmentPage() {
 
     setLatestAssignment(result.assignment)
     saveLastStudentUsn(result.assignment.usn)
+    saveStudentTaskSnapshot(result.assignment.usn, result.assignment.taskId)
     setMentorMessage(`Reassigned ${result.assignment.usn} to ${result.assignment.taskId}.`)
     await refreshFromServer()
+  }
+
+  const handleStudentLogin = async () => {
+    if (!studentLoginUsn.trim() || !studentLoginPassword.trim()) {
+      setStudentLoginMessage('USN is required in both username and password fields.')
+      return
+    }
+
+    const cachedTask = getStudentTaskSnapshot(studentLoginUsn)
+    try {
+      const result = await loginStudentByUsn(studentLoginUsn, studentLoginPassword, cachedTask)
+      setStudentLoggedInUsn(result.usn)
+      saveLastStudentUsn(result.usn)
+      setCachedRecoveredTask(result.recoveredTaskId ?? cachedTask)
+      setMustChangePassword(result.mustChangePassword)
+      setStudentProfileName(result.profileName ?? '')
+      if (result.assignmentFound && result.assignment) {
+        setLatestAssignment(result.assignment)
+        saveStudentTaskSnapshot(result.assignment.usn, result.assignment.taskId)
+        setShowRecoveryChooser(false)
+        setStudentLoginMessage(
+          result.mustChangePassword
+            ? `Login successful. Existing assignment found: ${result.assignment.taskId}. Please change your password now.`
+            : `Login successful. Existing assignment found: ${result.assignment.taskId}.`,
+        )
+        return
+      }
+
+      const fallbackTask = result.recoveredTaskId ?? cachedTask
+      setStudentRecoveryTask(fallbackTask || 'S01')
+      setShowRecoveryChooser(true)
+      setStudentLoginMessage(result.message)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setStudentLoginMessage('Invalid login. Use the same USN for username and password.')
+        return
+      }
+      setStudentLoginMessage('Login failed. Please try again.')
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!studentLoggedInUsn) {
+      setStudentLoginMessage('Login first before changing password.')
+      return
+    }
+    if (newPassword.trim().length < 6) {
+      setStudentLoginMessage('New password must be at least 6 characters.')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setStudentLoginMessage('New password and confirm password do not match.')
+      return
+    }
+
+    try {
+      await changeStudentPassword(studentLoggedInUsn, studentLoginPassword, newPassword)
+      setStudentLoginPassword(newPassword)
+      setNewPassword('')
+      setConfirmNewPassword('')
+      setMustChangePassword(false)
+      setStudentLoginMessage('Password updated successfully. You can continue with your profile.')
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setStudentLoginMessage('Current password is invalid. Login again and retry.')
+        return
+      }
+      setStudentLoginMessage('Password change failed. Please try again.')
+    }
+  }
+
+  const handleStudentRecovery = async () => {
+    if (!studentLoggedInUsn) {
+      setStudentLoginMessage('Login first before recovering assignment.')
+      return
+    }
+
+    try {
+      const result = await recoverStudentAssignment(
+        studentLoggedInUsn,
+        studentLoginPassword,
+        studentRecoveryTask,
+        name || undefined,
+        cachedRecoveredTask || undefined,
+      )
+      setLatestAssignment(result.assignment)
+      saveLastStudentUsn(result.assignment.usn)
+      saveStudentTaskSnapshot(result.assignment.usn, result.assignment.taskId)
+      setShowRecoveryChooser(false)
+      setStudentLoginMessage(
+        result.matchedCachedTask
+          ? `Recovered successfully. Selected task ${result.assignment.taskId} matches your cached assignment.`
+          : `Recovered successfully with task ${result.assignment.taskId}.`,
+      )
+      await refreshFromServer()
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 422) {
+        setStudentLoginMessage('Invalid task selection. Choose a valid task.')
+        return
+      }
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setStudentLoginMessage('Student authentication failed. Use USN as both username and password.')
+        return
+      }
+      setStudentLoginMessage('Could not recover assignment right now.')
+    }
   }
 
   const handleExportCsv = () => {
@@ -291,6 +414,104 @@ export default function TaskAssignmentPage() {
       </section>
 
       <section className="card assignment-page-grid">
+        <div>
+          <h2>Student Login & Recovery</h2>
+          <p>If old records are missing, login first and recover your assigned task from cache/history.</p>
+          <div className="assignment-form">
+            <label>
+              Username (USN)
+              <input
+                type="text"
+                value={studentLoginUsn}
+                onChange={(event) => setStudentLoginUsn(event.target.value)}
+                placeholder="USN"
+              />
+            </label>
+            <label>
+              Password (same as USN)
+              <input
+                type="password"
+                value={studentLoginPassword}
+                onChange={(event) => setStudentLoginPassword(event.target.value)}
+                placeholder="Enter same USN"
+              />
+            </label>
+            <button type="button" className="button-link secondary" onClick={handleStudentLogin}>
+              Login Student
+            </button>
+          </div>
+          {studentLoginMessage && <p>{studentLoginMessage}</p>}
+          {studentLoggedInUsn && (
+            <div className="task-recovery-wrap">
+              <h3>Student Profile</h3>
+              <p>
+                Logged in as <strong>{studentLoggedInUsn}</strong>
+                {studentProfileName ? ` (${studentProfileName})` : ''}
+              </p>
+              <p>
+                Password status:{' '}
+                <strong>{mustChangePassword ? 'First-time login. Change required.' : 'Configured'}</strong>
+              </p>
+              <div className="assignment-form">
+                <label>
+                  New Password
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="At least 6 characters"
+                  />
+                </label>
+                <label>
+                  Confirm New Password
+                  <input
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(event) => setConfirmNewPassword(event.target.value)}
+                    placeholder="Repeat new password"
+                  />
+                </label>
+                <button type="button" className="button-link secondary" onClick={handleChangePassword}>
+                  Change Password
+                </button>
+              </div>
+            </div>
+          )}
+          {showRecoveryChooser && (
+            <div className="task-recovery-wrap">
+              <h3>Select Your Previously Assigned Problem Statement</h3>
+              {cachedRecoveredTask && (
+                <p>
+                  Recovered from local cache: <strong>{cachedRecoveredTask}</strong>. This option is highlighted and other tasks are locked.
+                </p>
+              )}
+              <div className="task-recovery-grid">
+                {taskOptions.map((task) => {
+                  const isRecovered = !!cachedRecoveredTask && task.id === cachedRecoveredTask
+                  const shouldDisable = !!cachedRecoveredTask && !isRecovered
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      className={`task-recovery-button ${isRecovered ? 'recovered' : ''}`}
+                      disabled={shouldDisable}
+                      onClick={() => setStudentRecoveryTask(task.id)}
+                    >
+                      {task.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p>
+                Selected task: <strong>{studentRecoveryTask}</strong>
+              </p>
+              <button type="button" className="button-link" onClick={handleStudentRecovery}>
+                Confirm and Recover in DB
+              </button>
+            </div>
+          )}
+        </div>
+
         <div>
           <h2>Assign Task</h2>
           <p>Each USN can be assigned only once. Duplicate USN submissions return the original task.</p>

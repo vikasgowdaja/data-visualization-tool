@@ -23,15 +23,21 @@ from fastapi.responses import JSONResponse
 
 from .assignment_store import (
     create_student_assignment_mongo,
+    get_student_auth_record_mongo,
     get_assignment_mode_mongo,
     get_student_by_usn_mongo,
     get_student_assignment_by_usn_mongo,
     init_assignment_store,
     list_students_mongo,
+    reset_student_password_to_default_mongo,
     list_student_assignments_mongo,
     seed_students_from_rows_mongo,
+    set_student_password_mongo,
     set_assignment_mode_mongo,
+    upsert_assignment_record_mongo,
+    upsert_student_record_mongo,
     update_student_assignment_task_mongo,
+    verify_student_password_mongo,
 )
 
 from .config import (
@@ -56,6 +62,7 @@ from .db import (
     get_analysis_session,
     get_dataset_record,
     get_next_dataset_version,
+    get_student_assignment_by_usn,
     init_db,
     list_analysis_sessions,
     list_dataset_records,
@@ -71,6 +78,7 @@ from .db import (
 from .schemas import (
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminResetStudentPasswordResponse,
     AdminSessionResponse,
     AssignmentModeResponse,
     AssignmentModeUpdateRequest,
@@ -87,6 +95,12 @@ from .schemas import (
     StudentAssignResult,
     StudentAssignmentResponse,
     StudentReassignRequest,
+    StudentLoginRequest,
+    StudentLoginResponse,
+    StudentChangePasswordRequest,
+    StudentChangePasswordResponse,
+    StudentRecoverAssignmentRequest,
+    StudentRecoverAssignmentResponse,
     SessionCreateRequest,
     SessionResponse,
     SessionUpdateRequest,
@@ -441,6 +455,15 @@ def _to_student_record_response(row) -> StudentRecordResponse:
     )
 
 
+def _to_student_assignment_from_student_record(row) -> StudentAssignmentResponse:
+    return StudentAssignmentResponse(
+        name=row["name"],
+        usn=row["usn"],
+        task_id=row["task_id"],
+        assigned_at=row["assigned_at"],
+    )
+
+
 @app.get("/api/assignments", response_model=list[StudentAssignmentResponse])
 def list_assignments() -> list[StudentAssignmentResponse]:
     try:
@@ -488,6 +511,145 @@ def create_random_assignment(payload: StudentAssignRequest) -> StudentAssignResu
 
     row = create_student_assignment_mongo(name=payload.name.strip(), usn=normalized_usn, task_id=random_task_id)
     return StudentAssignResult(status="created", assignment=_to_student_assignment_response(row))
+
+
+@app.post("/api/students/login", response_model=StudentLoginResponse)
+def student_login(payload: StudentLoginRequest) -> StudentLoginResponse:
+    normalized_username = _normalize_usn(payload.username)
+    is_valid_password, must_change_password = verify_student_password_mongo(normalized_username, payload.password)
+    if not is_valid_password:
+        raise HTTPException(status_code=401, detail="Invalid student credentials")
+
+    recovered_task_id = payload.cached_task_id.strip().upper() if payload.cached_task_id else None
+    usn = normalized_username
+
+    try:
+        student_row = get_student_by_usn_mongo(usn)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+
+    if student_row is None:
+        try:
+            assignment_row = get_student_assignment_by_usn_mongo(usn)
+        except RuntimeError as exc:
+            _raise_assignment_backend_unavailable(exc)
+        if assignment_row is not None:
+            try:
+                student_row = upsert_student_record_mongo(
+                    name=assignment_row["name"],
+                    usn=assignment_row["usn"],
+                    task_id=assignment_row["task_id"],
+                    assigned_at=assignment_row["assigned_at"],
+                )
+            except RuntimeError as exc:
+                _raise_assignment_backend_unavailable(exc)
+
+    auth_record = get_student_auth_record_mongo(usn)
+    if auth_record is not None:
+        must_change_password = bool(auth_record.get("password_must_change", must_change_password))
+
+    if student_row is None:
+        sqlite_row = get_student_assignment_by_usn(usn)
+        if sqlite_row is not None:
+            assigned_at = str(sqlite_row["assigned_at"])
+            try:
+                assignment_row = upsert_assignment_record_mongo(
+                    name=str(sqlite_row["name"]),
+                    usn=str(sqlite_row["usn"]),
+                    task_id=str(sqlite_row["task_id"]),
+                    assigned_at=assigned_at,
+                )
+                student_row = upsert_student_record_mongo(
+                    name=assignment_row["name"],
+                    usn=assignment_row["usn"],
+                    task_id=assignment_row["task_id"],
+                    assigned_at=assignment_row["assigned_at"],
+                )
+            except RuntimeError as exc:
+                _raise_assignment_backend_unavailable(exc)
+
+    if student_row is None:
+        return StudentLoginResponse(
+            usn=usn,
+            assignment_found=False,
+            assignment=None,
+            recovered_task_id=recovered_task_id,
+            must_change_password=must_change_password,
+            profile_name=None,
+            message="No assignment found in database. Select your previously assigned task to recover your record.",
+        )
+
+    return StudentLoginResponse(
+        usn=usn,
+        assignment_found=True,
+        assignment=_to_student_assignment_from_student_record(student_row),
+        recovered_task_id=recovered_task_id,
+        must_change_password=must_change_password,
+        profile_name=student_row["name"],
+        message="Assignment loaded successfully.",
+    )
+
+
+@app.post("/api/students/recover-assignment", response_model=StudentRecoverAssignmentResponse)
+def recover_student_assignment(payload: StudentRecoverAssignmentRequest) -> StudentRecoverAssignmentResponse:
+    normalized_username = _normalize_usn(payload.username)
+    is_valid_password, _ = verify_student_password_mongo(normalized_username, payload.password)
+    if not is_valid_password:
+        raise HTTPException(status_code=401, detail="Invalid student credentials")
+
+    task_id = payload.task_id.strip().upper()
+    if task_id not in _student_task_ids:
+        raise HTTPException(status_code=422, detail="Invalid task id")
+
+    usn = normalized_username
+    name = payload.name.strip() if payload.name and payload.name.strip() else f"Student {usn}"
+    assigned_at = datetime.now(tz=timezone.utc).isoformat()
+
+    try:
+        assignment_row = upsert_assignment_record_mongo(name=name, usn=usn, task_id=task_id, assigned_at=assigned_at)
+        upsert_student_record_mongo(
+            name=assignment_row["name"],
+            usn=assignment_row["usn"],
+            task_id=assignment_row["task_id"],
+            assigned_at=assignment_row["assigned_at"],
+        )
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+
+    cached_task_id = payload.cached_task_id.strip().upper() if payload.cached_task_id else None
+    matched_cached_task = bool(cached_task_id and cached_task_id == task_id)
+
+    return StudentRecoverAssignmentResponse(
+        status="matched-cache" if matched_cached_task else "saved",
+        matched_cached_task=matched_cached_task,
+        assignment=_to_student_assignment_response(assignment_row),
+    )
+
+
+@app.post("/api/students/change-password", response_model=StudentChangePasswordResponse)
+def student_change_password(payload: StudentChangePasswordRequest) -> StudentChangePasswordResponse:
+    usn = _normalize_usn(payload.usn)
+    is_valid_password, _ = verify_student_password_mongo(usn, payload.current_password)
+    if not is_valid_password:
+        raise HTTPException(status_code=401, detail="Current password is invalid")
+
+    new_password = payload.new_password.strip()
+    if len(new_password) < 6:
+        raise HTTPException(status_code=422, detail="New password must be at least 6 characters")
+
+    changed = set_student_password_mongo(usn, new_password, force_must_change=False)
+    if not changed:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    return StudentChangePasswordResponse(usn=usn, password_changed=True)
+
+
+@app.post("/api/students/{usn}/reset-password", response_model=AdminResetStudentPasswordResponse)
+def admin_reset_student_password(usn: str, _admin: str = Depends(require_admin_user)) -> AdminResetStudentPasswordResponse:
+    normalized_usn = _normalize_usn(usn)
+    reset = reset_student_password_to_default_mongo(normalized_usn)
+    if not reset:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    return AdminResetStudentPasswordResponse(usn=normalized_usn, reset_to_default=True)
 
 
 @app.put("/api/assignments/{usn}/task", response_model=StudentAssignmentResponse)
