@@ -1,3 +1,4 @@
+import { toNumber, groupMean, histogram, correlation } from '../utils/dataMath'
 import { useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toPng } from 'html-to-image'
@@ -23,7 +24,7 @@ import {
 } from 'recharts'
 import ModulePage from '../components/ModulePage'
 import { fetchRecentDatasets } from '../services/datasets'
-import { fetchAllRows, type DataRow } from '../services/explorer'
+import { fetchAllRows } from '../services/explorer'
 import { logProgressEvent } from '../services/platform'
 import '../App.css'
 
@@ -103,73 +104,6 @@ const CHART_BY_OBJECTIVE: Record<Objective, { chart: ChartType; reason: string; 
   },
 }
 
-function toNumber(value: string | number | null | undefined): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
-}
-
-function groupMean(rows: DataRow[], groupKey: string, targetKey: string): Array<{ name: string; value: number }> {
-  const map = new Map<string, { sum: number; count: number }>()
-  for (const row of rows) {
-    const group = String(row[groupKey] ?? 'Unknown')
-    const value = toNumber(row[targetKey])
-    if (value === null) continue
-    const entry = map.get(group)
-    if (!entry) {
-      map.set(group, { sum: value, count: 1 })
-    } else {
-      entry.sum += value
-      entry.count += 1
-    }
-  }
-  return Array.from(map.entries()).map(([name, agg]) => ({ name, value: Number((agg.sum / agg.count).toFixed(2)) }))
-}
-
-function histogram(rows: DataRow[], key: string, bins = 12): Array<{ name: string; count: number }> {
-  const values = rows.map((row) => toNumber(row[key])).filter((v): v is number => v !== null)
-  if (values.length === 0) return []
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const width = (max - min || 1) / bins
-  const counts = Array.from({ length: bins }, () => 0)
-  for (const value of values) {
-    const index = Math.min(bins - 1, Math.floor((value - min) / width))
-    counts[index] += 1
-  }
-  return counts.map((count, index) => {
-    const start = min + index * width
-    const end = start + width
-    return { name: `${start.toFixed(1)}-${end.toFixed(1)}`, count }
-  })
-}
-
-function correlation(rows: DataRow[], xKey: string, yKey: string): number | null {
-  const points = rows
-    .map((row) => ({ x: toNumber(row[xKey]), y: toNumber(row[yKey]) }))
-    .filter((p): p is { x: number; y: number } => p.x !== null && p.y !== null)
-  if (points.length < 3) return null
-  const n = points.length
-  const meanX = points.reduce((acc, p) => acc + p.x, 0) / n
-  const meanY = points.reduce((acc, p) => acc + p.y, 0) / n
-  let numerator = 0
-  let denomX = 0
-  let denomY = 0
-  for (const point of points) {
-    const dx = point.x - meanX
-    const dy = point.y - meanY
-    numerator += dx * dy
-    denomX += dx * dx
-    denomY += dy * dy
-  }
-  const denominator = Math.sqrt(denomX * denomY)
-  if (denominator === 0) return null
-  return Number((numerator / denominator).toFixed(3))
-}
-
 export default function VisualizationLabPage() {
   const chartRef = useRef<HTMLDivElement | null>(null)
   const [datasetId, setDatasetId] = useState('')
@@ -212,7 +146,7 @@ export default function VisualizationLabPage() {
     return groupMean(rows, groupBy, yAxis)
   }, [rows, groupBy, yAxis])
 
-  const histData = useMemo(() => (xAxis ? histogram(rows, xAxis) : []), [rows, xAxis])
+  const histData = useMemo(() => (xAxis ? histogram(rows, xAxis, 12) : []), [rows, xAxis])
 
   const pieData = useMemo(() => {
     if (!groupBy) return []
