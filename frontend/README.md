@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## Data math utilities
+
+Shared pure calculations live in `src/utils/dataMath.ts`: numeric parsing,
+group means, histograms, correlation, and IQR outlier counting. Callers choose
+chart ordering and bin counts so the legacy explorer and Visualization Lab
+keep their existing presentation.
+
+Run `npm test` with Node.js 22.6+ (or Node.js 24) for utility regression tests.
+Run `npm run build` to type-check and build the app, and `npm run lint -- src tests` for lint checks.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

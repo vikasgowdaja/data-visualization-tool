@@ -1,3 +1,4 @@
+import { toNumber } from '../utils/dataMath'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
@@ -20,14 +21,6 @@ import type { DatasetId, Difficulty } from '../types/dataset'
 type ExplorerTab = 'overview' | 'preview' | 'columns' | 'statistics' | 'missing' | 'duplicates' | 'outliers'
 
 type SortDirection = 'asc' | 'desc'
-
-function toNullableNumber(input: string): number | undefined {
-  if (!input.trim()) {
-    return undefined
-  }
-  const n = Number(input)
-  return Number.isFinite(n) ? n : undefined
-}
 
 export default function DataExplorerPage() {
   const [selectedProject, setSelectedProject] = useState<DatasetId>('student_performance')
@@ -150,8 +143,8 @@ export default function DataExplorerPage() {
         sort_dir: sortDir,
         filter_column: filterColumn,
         filter_value: filterValue,
-        numeric_min: toNullableNumber(numericMinText),
-        numeric_max: toNullableNumber(numericMaxText),
+        numeric_min: toNumber(numericMinText) ?? undefined,
+        numeric_max: toNumber(numericMaxText) ?? undefined,
         missing_only: missingOnly,
       }),
     enabled: Boolean(datasetId),
