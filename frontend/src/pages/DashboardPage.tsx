@@ -1,10 +1,12 @@
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchProgressSummary, listSessions } from '../services/platform'
-import { getLastDatasetTitle, getLastModule } from '../services/studentState'
+import { getLastDatasetTitle, getLastModule, getLastStudentUsn, saveLastStudentUsn } from '../services/studentState'
 import { getTaskById, listStudentAssignments } from '../services/taskAssignments'
+import { fetchStudents } from '../services/students'
 
 function humanizeModule(pathname: string | null): string {
   if (!pathname) {
@@ -23,6 +25,7 @@ function humanizeModule(pathname: string | null): string {
 export default function DashboardPage() {
   const lastDataset = getLastDatasetTitle()
   const lastModule = humanizeModule(getLastModule())
+  const [myUsnInput, setMyUsnInput] = useState(getLastStudentUsn())
   const assignmentsQuery = useQuery({
     queryKey: ['student-assignments', 'dashboard'],
     queryFn: listStudentAssignments,
@@ -40,6 +43,28 @@ export default function DashboardPage() {
     queryKey: ['sessions', 'dashboard'],
     queryFn: () => listSessions(20),
   })
+  const studentsQuery = useQuery({
+    queryKey: ['students', 'dashboard'],
+    queryFn: fetchStudents,
+    refetchInterval: 3000,
+  })
+
+  const myStudentRecord = useMemo(() => {
+    const usn = myUsnInput.trim().toUpperCase()
+    if (!usn || !studentsQuery.data) {
+      return null
+    }
+    return studentsQuery.data.find((item) => item.usn === usn) ?? null
+  }, [myUsnInput, studentsQuery.data])
+
+  const handleSaveMyUsn = () => {
+    if (!myUsnInput.trim()) {
+      return
+    }
+    const normalized = myUsnInput.trim().toUpperCase()
+    setMyUsnInput(normalized)
+    saveLastStudentUsn(normalized)
+  }
 
   return (
     <ModulePage
@@ -111,6 +136,57 @@ export default function DashboardPage() {
                 </li>
               )
             })}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Common Student Dashboard</h2>
+        <p>Centralized MongoDB-backed student list visible to all users.</p>
+        {studentsQuery.isLoading && <p>Loading students...</p>}
+        {studentsQuery.isError && <p>Could not load student list right now.</p>}
+        {!studentsQuery.isLoading && !studentsQuery.isError && (studentsQuery.data?.length ?? 0) === 0 && (
+          <p>No student records yet. Assign tasks first, or seed from Python/SQLite records.</p>
+        )}
+        {!!studentsQuery.data?.length && (
+          <ul className="simple-list">
+            {studentsQuery.data.map((student) => {
+              const task = getTaskById(student.task_id)
+              return (
+                <li key={student.usn}>
+                  {student.name} ({student.usn}) {'->'} {task?.id ?? student.task_id}: {task?.title ?? 'Task unavailable'}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>My Student Record</h2>
+        <p>Enter your USN to view only your own centralized record.</p>
+        <div className="assignment-form">
+          <label>
+            USN
+            <input
+              type="text"
+              value={myUsnInput}
+              onChange={(event) => setMyUsnInput(event.target.value)}
+              placeholder="Enter your USN"
+            />
+          </label>
+          <button type="button" className="button-link secondary" onClick={handleSaveMyUsn}>
+            Show My Record
+          </button>
+        </div>
+        {myUsnInput.trim() && !myStudentRecord && !studentsQuery.isLoading && <p>No record found for this USN.</p>}
+        {myStudentRecord && (
+          <ul className="simple-list">
+            <li>Name: {myStudentRecord.name}</li>
+            <li>USN: {myStudentRecord.usn}</li>
+            <li>Task ID: {myStudentRecord.task_id}</li>
+            <li>Task Title: {getTaskById(myStudentRecord.task_id)?.title ?? 'Task unavailable'}</li>
+            <li>Assigned At: {new Date(myStudentRecord.assigned_at).toLocaleString()}</li>
           </ul>
         )}
       </section>

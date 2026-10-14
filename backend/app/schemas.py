@@ -146,3 +146,15 @@ class AssignmentModeResponse(BaseModel):
 
 class AssignmentModeUpdateRequest(BaseModel):
     mode: Literal["self-assign", "mentor-only"]
+
+
+class StudentRecordResponse(BaseModel):
+    name: str
+    usn: str
+    task_id: str
+    assigned_at: str
+    updated_at: str
+
+
+class SeedStudentsResponse(BaseModel):
+    seeded: int

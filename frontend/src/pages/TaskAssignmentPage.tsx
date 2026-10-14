@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ModulePage from '../components/ModulePage'
+import { saveLastStudentUsn } from '../services/studentState'
 import {
   assignRandomTask,
   exportAssignmentsCsv,
@@ -101,6 +102,7 @@ export default function TaskAssignmentPage() {
     }
 
     const result = await assignRandomTask(name, usn)
+    saveLastStudentUsn(result.assignment.usn)
     setLatestAssignment(result.assignment)
 
     if (result.status === 'duplicate') {
@@ -136,6 +138,7 @@ export default function TaskAssignmentPage() {
     }
 
     setLatestAssignment(result.assignment)
+    saveLastStudentUsn(result.assignment.usn)
     setMentorMessage(`Reassigned ${result.assignment.usn} to ${result.assignment.taskId}.`)
     await refreshFromServer()
   }

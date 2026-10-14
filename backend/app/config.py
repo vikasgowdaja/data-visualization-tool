@@ -38,6 +38,7 @@ MONGODB_URI = os.getenv("MONGODB_URI", "").strip()
 MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "datascience_lab").strip() or "datascience_lab"
 MONGODB_ASSIGNMENTS_COLLECTION = os.getenv("MONGODB_ASSIGNMENTS_COLLECTION", "student_assignments").strip() or "student_assignments"
 MONGODB_SETTINGS_COLLECTION = os.getenv("MONGODB_SETTINGS_COLLECTION", "assignment_settings").strip() or "assignment_settings"
+MONGODB_STUDENTS_COLLECTION = os.getenv("MONGODB_STUDENTS_COLLECTION", "students").strip() or "students"
 
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)

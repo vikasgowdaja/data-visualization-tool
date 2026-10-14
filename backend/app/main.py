@@ -20,12 +20,16 @@ from fastapi.responses import JSONResponse
 from .assignment_store import (
     create_student_assignment_mongo,
     get_assignment_mode_mongo,
+    get_student_by_usn_mongo,
     get_student_assignment_by_usn_mongo,
     init_assignment_store,
+    list_students_mongo,
     list_student_assignments_mongo,
+    seed_students_from_rows_mongo,
     set_assignment_mode_mongo,
     update_student_assignment_task_mongo,
 )
+
 from .config import CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS, FRONTEND_DIST_DIR, GENERATED_DIR
 from .dataset_generator import (
     generate_dataset as generate_dataset_bundle,
@@ -48,7 +52,9 @@ from .db import (
     save_dataset_version,
     summarize_progress_events,
     update_analysis_session,
+    list_student_assignments,
 )
+
 from .schemas import (
     AssignmentModeResponse,
     AssignmentModeUpdateRequest,
@@ -68,6 +74,8 @@ from .schemas import (
     SessionCreateRequest,
     SessionResponse,
     SessionUpdateRequest,
+    SeedStudentsResponse,
+    StudentRecordResponse,
 )
 
 app = FastAPI(title="DataScience Lab API", version="0.1.0")
@@ -337,6 +345,16 @@ def _raise_assignment_backend_unavailable(exc: Exception) -> None:
     raise HTTPException(status_code=503, detail=f"Assignment backend unavailable: {exc}") from exc
 
 
+def _to_student_record_response(row) -> StudentRecordResponse:
+    return StudentRecordResponse(
+        name=row["name"],
+        usn=row["usn"],
+        task_id=row["task_id"],
+        assigned_at=row["assigned_at"],
+        updated_at=row["updated_at"],
+    )
+
+
 @app.get("/api/assignments", response_model=list[StudentAssignmentResponse])
 def list_assignments() -> list[StudentAssignmentResponse]:
     try:
@@ -400,6 +418,46 @@ def reassign_student_task(usn: str, payload: StudentReassignRequest) -> StudentA
     if row is None:
         raise HTTPException(status_code=404, detail="Student assignment not found")
     return _to_student_assignment_response(row)
+
+
+@app.get("/api/students", response_model=list[StudentRecordResponse])
+def list_students() -> list[StudentRecordResponse]:
+    try:
+        rows = list_students_mongo()
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    return [_to_student_record_response(row) for row in rows]
+
+
+@app.get("/api/students/{usn}", response_model=StudentRecordResponse)
+def get_student(usn: str) -> StudentRecordResponse:
+    normalized_usn = _normalize_usn(usn)
+    try:
+        row = get_student_by_usn_mongo(normalized_usn)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return _to_student_record_response(row)
+
+
+@app.post("/api/students/seed-from-sqlite", response_model=SeedStudentsResponse)
+def seed_students_from_sqlite() -> SeedStudentsResponse:
+    sqlite_rows = list_student_assignments()
+    rows = [
+        {
+            "name": str(row["name"]),
+            "usn": str(row["usn"]).strip().upper(),
+            "task_id": str(row["task_id"]),
+            "assigned_at": str(row["assigned_at"]),
+        }
+        for row in sqlite_rows
+    ]
+    try:
+        result = seed_students_from_rows_mongo(rows)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    return SeedStudentsResponse(seeded=result["seeded"])
 
 
 def _try_cast(value: str) -> object | None:
