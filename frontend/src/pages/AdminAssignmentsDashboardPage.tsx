@@ -341,9 +341,10 @@ export default function AdminAssignmentsDashboardPage() {
                   const mustChange = studentStatusByUsn.get(assignment.usn)
                   const passwordStatus =
                     mustChange === undefined ? 'unknown' : mustChange ? 'default/reset-required' : 'changed'
+                  const persistedLocked = studentTaskLockByUsn.get(assignment.usn) ?? false
                   const control = rowControls[assignment.usn] ?? {
                     taskId: assignment.taskId,
-                    lockTask: studentTaskLockByUsn.get(assignment.usn) ?? false,
+                    lockTask: persistedLocked,
                   }
                   const task = getTaskById(assignment.taskId)
                   return (
@@ -351,16 +352,23 @@ export default function AdminAssignmentsDashboardPage() {
                       <td>{assignment.name}</td>
                       <td>{assignment.usn}</td>
                       <td>{passwordStatus}</td>
-                      <td>{control.lockTask ? 'Locked' : 'Open'}</td>
+                      <td>
+                        <span
+                          className={`lock-status-badge ${persistedLocked ? 'locked' : 'open'}`}
+                          title={persistedLocked ? 'Locked' : 'Open'}
+                          aria-label={persistedLocked ? 'Locked' : 'Open'}
+                        />
+                      </td>
                       <td>{task?.id ?? assignment.taskId}</td>
                       <td>{task?.type ?? 'unknown'}</td>
                       <td>{task?.title ?? 'Task unavailable'}</td>
                       <td>{task?.details ?? 'No task details found.'}</td>
                       <td>{new Date(assignment.assignedAt).toLocaleString()}</td>
                       <td>
-                        <div className="assignment-form">
+                        <div className="assignment-form row-actions-compact">
                           <select
                             value={control.taskId}
+                            disabled={persistedLocked}
                             onChange={(event) => {
                               const value = event.target.value
                               setRowControls((previous) => ({
@@ -378,27 +386,27 @@ export default function AdminAssignmentsDashboardPage() {
                               </option>
                             ))}
                           </select>
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={control.lockTask}
-                              onChange={(event) => {
-                                const value = event.target.checked
-                                setRowControls((previous) => ({
-                                  ...previous,
-                                  [assignment.usn]: {
-                                    ...(previous[assignment.usn] ?? control),
-                                    lockTask: value,
-                                  },
-                                }))
-                              }}
-                            />
-                            Lock
-                          </label>
                           <button
                             type="button"
-                            className="button-link secondary"
+                            className="button-link secondary icon-action"
+                            title={control.lockTask ? 'Set unlocked state' : 'Set locked state'}
+                            onClick={() => {
+                              setRowControls((previous) => ({
+                                ...previous,
+                                [assignment.usn]: {
+                                  ...(previous[assignment.usn] ?? control),
+                                  lockTask: !control.lockTask,
+                                },
+                              }))
+                            }}
+                          >
+                            {control.lockTask ? 'L' : 'O'}
+                          </button>
+                          <button
+                            type="button"
+                            className="button-link secondary icon-action"
                             disabled={taskControlMutation.isPending}
+                            title="Save task and lock state"
                             onClick={() => {
                               setRowActionMessage('')
                               taskControlMutation.mutate({
@@ -408,18 +416,19 @@ export default function AdminAssignmentsDashboardPage() {
                               })
                             }}
                           >
-                            Save
+                            S
                           </button>
                           <button
                             type="button"
-                            className="button-link secondary"
+                            className="button-link secondary icon-action"
                             disabled={resetPasswordMutation.isPending}
+                            title="Reset password to default"
                             onClick={() => {
                               setRowActionMessage('')
                               resetPasswordMutation.mutate(assignment.usn)
                             }}
                           >
-                            Reset Password
+                            R
                           </button>
                         </div>
                       </td>
