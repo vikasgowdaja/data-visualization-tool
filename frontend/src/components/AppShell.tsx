@@ -64,6 +64,18 @@ export default function AppShell({ navItems, children }: AppShellProps) {
   }
 
   const currentModule = useMemo(() => pathToLabel[location.pathname] ?? 'Module', [location.pathname])
+  const visibleNavItems = useMemo(() => {
+    const hiddenLoginRoutes = new Set(['/student-login', '/admin-login'])
+    return navItems.filter((item) => {
+      if (hiddenLoginRoutes.has(item.to)) {
+        return false
+      }
+      if (item.to === '/admin-assignments' && !hasAdminSession) {
+        return false
+      }
+      return true
+    })
+  }, [navItems, hasAdminSession])
   const breadcrumbs = useMemo(() => {
     if (location.pathname === '/') {
       return ['Home']
@@ -79,7 +91,7 @@ export default function AppShell({ navItems, children }: AppShellProps) {
           <h2>DataScience Lab</h2>
         </div>
         <nav className="side-nav" aria-label="Primary navigation">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
