@@ -1,3 +1,6 @@
+import axios from 'axios'
+import { API_BASE } from './api'
+
 export type StudentTaskType = 'feature' | 'refactor' | 'bug' | 'devops-docs'
 
 export type StudentTask = {
@@ -16,8 +19,21 @@ export type StudentAssignment = {
 
 export type AssignmentMode = 'self-assign' | 'mentor-only'
 
-const ASSIGNMENTS_KEY = 'dslab:studentAssignments'
-const ASSIGNMENT_MODE_KEY = 'dslab:assignmentMode'
+type AssignmentApiResponse = {
+  name: string
+  usn: string
+  task_id: string
+  assigned_at: string
+}
+
+type AssignmentModeApiResponse = {
+  mode: AssignmentMode
+}
+
+type AssignRandomApiResponse = {
+  status: 'created' | 'duplicate'
+  assignment: AssignmentApiResponse
+}
 
 export const STUDENT_TASKS: StudentTask[] = [
   {
@@ -148,28 +164,13 @@ export const STUDENT_TASKS: StudentTask[] = [
   },
 ]
 
-function normalizeUsn(usn: string): string {
-  return usn.trim().toUpperCase()
-}
-
-function loadAssignments(): StudentAssignment[] {
-  const raw = localStorage.getItem(ASSIGNMENTS_KEY)
-  if (!raw) {
-    return []
+function toAssignment(item: AssignmentApiResponse): StudentAssignment {
+  return {
+    name: item.name,
+    usn: item.usn,
+    taskId: item.task_id,
+    assignedAt: item.assigned_at,
   }
-  try {
-    const parsed = JSON.parse(raw) as StudentAssignment[]
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-    return parsed
-  } catch {
-    return []
-  }
-}
-
-function saveAssignments(assignments: StudentAssignment[]): void {
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments))
 }
 
 function csvEscape(value: string): string {
@@ -177,17 +178,9 @@ function csvEscape(value: string): string {
   return `"${escaped}"`
 }
 
-export function getAssignmentMode(): AssignmentMode {
-  const stored = localStorage.getItem(ASSIGNMENT_MODE_KEY)
-  return stored === 'mentor-only' ? 'mentor-only' : 'self-assign'
-}
-
-export function setAssignmentMode(mode: AssignmentMode): void {
-  localStorage.setItem(ASSIGNMENT_MODE_KEY, mode)
-}
-
-export function listStudentAssignments(): StudentAssignment[] {
-  return loadAssignments().sort((a, b) => a.usn.localeCompare(b.usn))
+export async function listStudentAssignments(): Promise<StudentAssignment[]> {
+  const response = await axios.get<AssignmentApiResponse[]>(`${API_BASE}/assignments`)
+  return response.data.map(toAssignment)
 }
 
 export function getTaskById(taskId: string): StudentTask | undefined {
@@ -198,65 +191,59 @@ export function getTaskOptions(): Array<{ id: string; label: string }> {
   return STUDENT_TASKS.map((task) => ({ id: task.id, label: `${task.id} - ${task.title}` }))
 }
 
-export function assignRandomTask(name: string, usn: string):
-  | { status: 'created'; assignment: StudentAssignment }
-  | { status: 'duplicate'; assignment: StudentAssignment } {
-  const normalizedUsn = normalizeUsn(usn)
-  const trimmedName = name.trim()
-  const assignments = loadAssignments()
-
-  const existing = assignments.find((entry) => normalizeUsn(entry.usn) === normalizedUsn)
-  if (existing) {
-    return { status: 'duplicate', assignment: existing }
-  }
-
-  const assignedTaskIds = new Set(assignments.map((entry) => entry.taskId))
-  const unassignedTasks = STUDENT_TASKS.filter((task) => !assignedTaskIds.has(task.id))
-  const pool = unassignedTasks.length > 0 ? unassignedTasks : STUDENT_TASKS
-  const randomTask = pool[Math.floor(Math.random() * pool.length)]
-
-  const created: StudentAssignment = {
-    name: trimmedName,
-    usn: normalizedUsn,
-    taskId: randomTask.id,
-    assignedAt: new Date().toISOString(),
-  }
-
-  assignments.push(created)
-  saveAssignments(assignments)
-
-  return { status: 'created', assignment: created }
+export async function getAssignmentMode(): Promise<AssignmentMode> {
+  const response = await axios.get<AssignmentModeApiResponse>(`${API_BASE}/assignments/mode`)
+  return response.data.mode
 }
 
-export function reassignTaskByUsn(usn: string, taskId: string):
+export async function setAssignmentMode(mode: AssignmentMode): Promise<AssignmentMode> {
+  const response = await axios.put<AssignmentModeApiResponse>(`${API_BASE}/assignments/mode`, { mode })
+  return response.data.mode
+}
+
+export async function assignRandomTask(name: string, usn: string): Promise<
+  | { status: 'created'; assignment: StudentAssignment }
+  | { status: 'duplicate'; assignment: StudentAssignment }
+> {
+  const response = await axios.post<AssignRandomApiResponse>(`${API_BASE}/assignments/assign-random`, { name, usn })
+  return {
+    status: response.data.status,
+    assignment: toAssignment(response.data.assignment),
+  }
+}
+
+export async function reassignTaskByUsn(
+  usn: string,
+  taskId: string,
+): Promise<
   | { status: 'updated'; assignment: StudentAssignment }
   | { status: 'not-found' }
-  | { status: 'invalid-task' } {
-  const assignments = loadAssignments()
-  const normalizedUsn = normalizeUsn(usn)
-  const index = assignments.findIndex((entry) => normalizeUsn(entry.usn) === normalizedUsn)
-
-  if (index < 0) {
-    return { status: 'not-found' }
+  | { status: 'invalid-task' }
+> {
+  try {
+    const response = await axios.put<AssignmentApiResponse>(`${API_BASE}/assignments/${encodeURIComponent(usn)}/task`, {
+      task_id: taskId,
+    })
+    return {
+      status: 'updated',
+      assignment: toAssignment(response.data),
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404) {
+        return { status: 'not-found' }
+      }
+      if (error.response?.status === 422) {
+        return { status: 'invalid-task' }
+      }
+    }
+    throw error
   }
-
-  const task = getTaskById(taskId)
-  if (!task) {
-    return { status: 'invalid-task' }
-  }
-
-  assignments[index] = {
-    ...assignments[index],
-    taskId: task.id,
-  }
-
-  saveAssignments(assignments)
-  return { status: 'updated', assignment: assignments[index] }
 }
 
-export function exportAssignmentsCsv(): string {
+export function exportAssignmentsCsv(assignments: StudentAssignment[]): string {
   const headers = ['Name', 'USN', 'Task ID', 'Task Type', 'Task Title', 'Task Details', 'Assigned At']
-  const rows = listStudentAssignments().map((assignment) => {
+  const rows = assignments.map((assignment) => {
     const task = getTaskById(assignment.taskId)
     return [
       assignment.name,

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import {
@@ -34,29 +35,19 @@ export default function AdminAssignmentsDashboardPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | StudentTaskType>('all')
   const [taskFilter, setTaskFilter] = useState<'all' | string>('all')
-  const [assignmentsVersion, setAssignmentsVersion] = useState(0)
+  const assignmentsQuery = useQuery({
+    queryKey: ['student-assignments', 'admin-dashboard'],
+    queryFn: listStudentAssignments,
+    refetchInterval: 3000,
+  })
+  const modeQuery = useQuery({
+    queryKey: ['assignment-mode', 'admin-dashboard'],
+    queryFn: getAssignmentMode,
+    refetchInterval: 3000,
+  })
 
-  const assignmentMode = useMemo(() => getAssignmentMode(), [assignmentsVersion])
-  const allAssignments = useMemo(() => listStudentAssignments(), [assignmentsVersion])
-
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && !event.key.startsWith('dslab:')) {
-        return
-      }
-      setAssignmentsVersion((prev) => prev + 1)
-    }
-
-    const intervalId = window.setInterval(() => {
-      setAssignmentsVersion((prev) => prev + 1)
-    }, 3000)
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => {
-      window.clearInterval(intervalId)
-      window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [])
+  const assignmentMode = modeQuery.data ?? 'self-assign'
+  const allAssignments = assignmentsQuery.data ?? []
 
   const filteredAssignments = useMemo(() => {
     const searchTerm = search.trim().toLowerCase()
@@ -107,7 +98,7 @@ export default function AdminAssignmentsDashboardPage() {
   }, [allAssignments])
 
   const handleExportCsv = () => {
-    const csv = exportAssignmentsCsv()
+    const csv = exportAssignmentsCsv(allAssignments)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
@@ -213,7 +204,9 @@ export default function AdminAssignmentsDashboardPage() {
 
       <section className="card">
         <h2>All Student Assignments</h2>
-        {filteredAssignments.length === 0 ? (
+        {assignmentsQuery.isLoading && <p>Loading assignment records...</p>}
+        {assignmentsQuery.isError && <p>Could not load assignment records right now.</p>}
+        {!assignmentsQuery.isLoading && !assignmentsQuery.isError && filteredAssignments.length === 0 ? (
           <p>No matching assignment records found.</p>
         ) : (
           <div className="admin-table-wrap">

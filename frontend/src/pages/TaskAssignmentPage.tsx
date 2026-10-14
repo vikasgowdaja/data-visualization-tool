@@ -4,8 +4,8 @@ import {
   assignRandomTask,
   exportAssignmentsCsv,
   getAssignmentMode,
-  getTaskOptions,
   getTaskById,
+  getTaskOptions,
   listStudentAssignments,
   reassignTaskByUsn,
   setAssignmentMode,
@@ -47,13 +47,41 @@ export default function TaskAssignmentPage() {
   const [message, setMessage] = useState('Enter Name and USN to get a random assignment.')
   const [mentorMessage, setMentorMessage] = useState('')
   const [latestAssignment, setLatestAssignment] = useState<StudentAssignment | null>(null)
-  const [assignmentMode, setAssignmentModeState] = useState<AssignmentMode>(getAssignmentMode())
+  const [assignmentMode, setAssignmentModeState] = useState<AssignmentMode>('self-assign')
   const [selectedUsnForReassign, setSelectedUsnForReassign] = useState('')
   const [selectedTaskForReassign, setSelectedTaskForReassign] = useState('S01')
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [assignments, setAssignments] = useState<StudentAssignment[]>([])
+  const [loadingAssignments, setLoadingAssignments] = useState(true)
 
-  const assignments = useMemo(() => listStudentAssignments(), [refreshKey])
   const taskOptions = useMemo(() => getTaskOptions(), [])
+
+  const refreshFromServer = async () => {
+    const [mode, rows] = await Promise.all([getAssignmentMode(), listStudentAssignments()])
+    setAssignmentModeState(mode)
+    setAssignments(rows)
+  }
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        await refreshFromServer()
+      } finally {
+        if (mounted) {
+          setLoadingAssignments(false)
+        }
+      }
+    })()
+
+    const intervalId = window.setInterval(() => {
+      void refreshFromServer()
+    }, 3000)
+
+    return () => {
+      mounted = false
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedUsnForReassign && assignments.length > 0) {
@@ -61,11 +89,7 @@ export default function TaskAssignmentPage() {
     }
   }, [assignments, selectedUsnForReassign])
 
-  const refreshBoard = () => {
-    setRefreshKey((prev) => prev + 1)
-  }
-
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (assignmentMode === 'mentor-only') {
       setMessage('Self-assignment is locked. Ask mentor to assign or reassign tasks using mentor controls.')
       return
@@ -76,7 +100,7 @@ export default function TaskAssignmentPage() {
       return
     }
 
-    const result = assignRandomTask(name, usn)
+    const result = await assignRandomTask(name, usn)
     setLatestAssignment(result.assignment)
 
     if (result.status === 'duplicate') {
@@ -85,22 +109,23 @@ export default function TaskAssignmentPage() {
       setMessage('Task assigned successfully. Share this task card with your mentor and create a feature branch.')
     }
 
-    refreshBoard()
+    await refreshFromServer()
   }
 
-  const handleToggleMode = () => {
+  const handleToggleMode = async () => {
     const nextMode: AssignmentMode = assignmentMode === 'self-assign' ? 'mentor-only' : 'self-assign'
-    setAssignmentMode(nextMode)
-    setAssignmentModeState(nextMode)
-    setMentorMessage(`Assignment mode switched to ${nextMode}.`)
+    const mode = await setAssignmentMode(nextMode)
+    setAssignmentModeState(mode)
+    setMentorMessage(`Assignment mode switched to ${mode}.`)
   }
 
-  const handleReassign = () => {
+  const handleReassign = async () => {
     if (!selectedUsnForReassign) {
       setMentorMessage('Select a student USN to reassign.')
       return
     }
-    const result = reassignTaskByUsn(selectedUsnForReassign, selectedTaskForReassign)
+
+    const result = await reassignTaskByUsn(selectedUsnForReassign, selectedTaskForReassign)
     if (result.status === 'not-found') {
       setMentorMessage('Selected USN was not found in assignment records.')
       return
@@ -109,13 +134,14 @@ export default function TaskAssignmentPage() {
       setMentorMessage('Selected task is invalid.')
       return
     }
+
     setLatestAssignment(result.assignment)
     setMentorMessage(`Reassigned ${result.assignment.usn} to ${result.assignment.taskId}.`)
-    refreshBoard()
+    await refreshFromServer()
   }
 
   const handleExportCsv = () => {
-    const csv = exportAssignmentsCsv()
+    const csv = exportAssignmentsCsv(assignments)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
@@ -229,7 +255,9 @@ export default function TaskAssignmentPage() {
 
       <section className="card">
         <h2>All Assigned Students</h2>
-        {assignments.length === 0 ? (
+        {loadingAssignments ? (
+          <p>Loading assignments...</p>
+        ) : assignments.length === 0 ? (
           <p>No student has been assigned yet.</p>
         ) : (
           <div className="assignment-list">

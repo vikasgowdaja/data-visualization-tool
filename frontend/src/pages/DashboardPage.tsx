@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
@@ -24,27 +23,11 @@ function humanizeModule(pathname: string | null): string {
 export default function DashboardPage() {
   const lastDataset = getLastDatasetTitle()
   const lastModule = humanizeModule(getLastModule())
-  const [assignmentsVersion, setAssignmentsVersion] = useState(0)
-  const assignments = useMemo(() => listStudentAssignments(), [assignmentsVersion])
-
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && !event.key.startsWith('dslab:')) {
-        return
-      }
-      setAssignmentsVersion((prev) => prev + 1)
-    }
-
-    const intervalId = window.setInterval(() => {
-      setAssignmentsVersion((prev) => prev + 1)
-    }, 3000)
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => {
-      window.clearInterval(intervalId)
-      window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [])
+  const assignmentsQuery = useQuery({
+    queryKey: ['student-assignments', 'dashboard'],
+    queryFn: listStudentAssignments,
+    refetchInterval: 3000,
+  })
   const recentDatasetsQuery = useQuery({
     queryKey: ['recent-datasets', 'dashboard'],
     queryFn: () => fetchRecentDatasets(6),
@@ -114,11 +97,13 @@ export default function DashboardPage() {
       <section className="card">
         <h2>Student Assignment Board</h2>
         <p>Live reference list for all assigned students and their random tasks.</p>
-        {assignments.length === 0 ? (
+        {assignmentsQuery.isLoading && <p>Loading assignments...</p>}
+        {assignmentsQuery.isError && <p>Could not load assignments right now.</p>}
+        {!assignmentsQuery.isLoading && !assignmentsQuery.isError && (assignmentsQuery.data?.length ?? 0) === 0 ? (
           <p>No assignments yet. Use Task Assignment page to register students.</p>
         ) : (
           <ul className="simple-list">
-            {assignments.map((assignment) => {
+            {(assignmentsQuery.data ?? []).map((assignment) => {
               const task = getTaskById(assignment.taskId)
               return (
                 <li key={assignment.usn}>

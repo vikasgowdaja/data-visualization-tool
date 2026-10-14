@@ -117,3 +117,32 @@ class ProgressEventRequest(BaseModel):
 class ProgressSummaryResponse(BaseModel):
     total_events: int
     by_module: dict[str, int]
+
+
+class StudentAssignmentResponse(BaseModel):
+    name: str
+    usn: str
+    task_id: str
+    assigned_at: str
+
+
+class StudentAssignRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    usn: str = Field(min_length=1, max_length=60)
+
+
+class StudentAssignResult(BaseModel):
+    status: Literal["created", "duplicate"]
+    assignment: StudentAssignmentResponse
+
+
+class StudentReassignRequest(BaseModel):
+    task_id: str = Field(min_length=1, max_length=20)
+
+
+class AssignmentModeResponse(BaseModel):
+    mode: Literal["self-assign", "mentor-only"]
+
+
+class AssignmentModeUpdateRequest(BaseModel):
+    mode: Literal["self-assign", "mentor-only"]

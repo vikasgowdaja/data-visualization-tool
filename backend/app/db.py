@@ -72,6 +72,30 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_dataset_versions_name_version ON dataset_versions(dataset_name, version_number DESC)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_progress_events_module ON progress_events(module)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS student_assignments (
+                    usn TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    assigned_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS assignment_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO assignment_settings (key, value, updated_at) VALUES (?, ?, ?)",
+                ("assignment_mode", "self-assign", datetime.now(tz=timezone.utc).isoformat()),
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_student_assignments_task_id ON student_assignments(task_id)")
         conn.commit()
     finally:
         conn.close()
@@ -326,5 +350,109 @@ def summarize_progress_events() -> list[sqlite3.Row]:
             """
         ).fetchall()
         return rows
+    finally:
+        conn.close()
+
+
+def list_student_assignments() -> list[sqlite3.Row]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT name, usn, task_id, assigned_at
+            FROM student_assignments
+            ORDER BY usn ASC
+            """
+        ).fetchall()
+        return rows
+    finally:
+        conn.close()
+
+
+def get_student_assignment_by_usn(usn: str) -> sqlite3.Row | None:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT name, usn, task_id, assigned_at
+            FROM student_assignments
+            WHERE usn = ?
+            """,
+            (usn,),
+        ).fetchone()
+        return row
+    finally:
+        conn.close()
+
+
+def create_student_assignment(name: str, usn: str, task_id: str) -> sqlite3.Row:
+    now = datetime.now(tz=timezone.utc).isoformat()
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO student_assignments (name, usn, task_id, assigned_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (name, usn, task_id, now),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT name, usn, task_id, assigned_at FROM student_assignments WHERE usn = ?",
+            (usn,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("Failed to load created student assignment")
+        return row
+    finally:
+        conn.close()
+
+
+def update_student_assignment_task(usn: str, task_id: str) -> sqlite3.Row | None:
+    conn = _connect()
+    try:
+        result = conn.execute(
+            "UPDATE student_assignments SET task_id = ? WHERE usn = ?",
+            (task_id, usn),
+        )
+        if result.rowcount <= 0:
+            conn.commit()
+            return None
+        conn.commit()
+        row = conn.execute(
+            "SELECT name, usn, task_id, assigned_at FROM student_assignments WHERE usn = ?",
+            (usn,),
+        ).fetchone()
+        return row
+    finally:
+        conn.close()
+
+
+def get_assignment_mode() -> str:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT value FROM assignment_settings WHERE key = ?",
+            ("assignment_mode",),
+        ).fetchone()
+        if row is None:
+            return "self-assign"
+        return str(row["value"])
+    finally:
+        conn.close()
+
+
+def set_assignment_mode(mode: str) -> None:
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO assignment_settings (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            """,
+            ("assignment_mode", mode, datetime.now(tz=timezone.utc).isoformat()),
+        )
+        conn.commit()
     finally:
         conn.close()

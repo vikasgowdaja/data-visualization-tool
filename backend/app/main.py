@@ -17,6 +17,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 
+from .assignment_store import (
+    create_student_assignment_mongo,
+    get_assignment_mode_mongo,
+    get_student_assignment_by_usn_mongo,
+    init_assignment_store,
+    list_student_assignments_mongo,
+    set_assignment_mode_mongo,
+    update_student_assignment_task_mongo,
+)
 from .config import CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS, FRONTEND_DIST_DIR, GENERATED_DIR
 from .dataset_generator import (
     generate_dataset as generate_dataset_bundle,
@@ -41,6 +50,8 @@ from .db import (
     update_analysis_session,
 )
 from .schemas import (
+    AssignmentModeResponse,
+    AssignmentModeUpdateRequest,
     DatasetGenerateRequest,
     DatasetProfileResponse,
     DatasetRecordResponse,
@@ -50,6 +61,10 @@ from .schemas import (
     PaginatedRowsResponse,
     ProgressEventRequest,
     ProgressSummaryResponse,
+    StudentAssignRequest,
+    StudentAssignResult,
+    StudentAssignmentResponse,
+    StudentReassignRequest,
     SessionCreateRequest,
     SessionResponse,
     SessionUpdateRequest,
@@ -63,6 +78,7 @@ if not logger.handlers:
 _generate_rate_window_secs = 60
 _generate_rate_limit = 30
 _ip_call_timestamps: dict[str, list[float]] = {}
+_student_task_ids = [f"S{index:02d}" for index in range(1, 22)]
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +92,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    try:
+        init_assignment_store()
+    except RuntimeError as exc:
+        logger.warning(f"Assignment store initialization skipped: {exc}")
 
 
 @app.middleware("http")
@@ -298,6 +318,88 @@ def progress_summary() -> ProgressSummaryResponse:
         total_events=sum(by_module.values()),
         by_module=by_module,
     )
+
+
+def _normalize_usn(usn: str) -> str:
+    return usn.strip().upper()
+
+
+def _to_student_assignment_response(row) -> StudentAssignmentResponse:
+    return StudentAssignmentResponse(
+        name=row["name"],
+        usn=row["usn"],
+        task_id=row["task_id"],
+        assigned_at=row["assigned_at"],
+    )
+
+
+def _raise_assignment_backend_unavailable(exc: Exception) -> None:
+    raise HTTPException(status_code=503, detail=f"Assignment backend unavailable: {exc}") from exc
+
+
+@app.get("/api/assignments", response_model=list[StudentAssignmentResponse])
+def list_assignments() -> list[StudentAssignmentResponse]:
+    try:
+        rows = list_student_assignments_mongo()
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    return [_to_student_assignment_response(row) for row in rows]
+
+
+@app.get("/api/assignments/mode", response_model=AssignmentModeResponse)
+def get_assignments_mode() -> AssignmentModeResponse:
+    try:
+        mode = get_assignment_mode_mongo()
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if mode not in {"self-assign", "mentor-only"}:
+        mode = "self-assign"
+    return AssignmentModeResponse(mode=mode)
+
+
+@app.put("/api/assignments/mode", response_model=AssignmentModeResponse)
+def update_assignments_mode(payload: AssignmentModeUpdateRequest) -> AssignmentModeResponse:
+    try:
+        set_assignment_mode_mongo(payload.mode)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    return AssignmentModeResponse(mode=payload.mode)
+
+
+@app.post("/api/assignments/assign-random", response_model=StudentAssignResult)
+def create_random_assignment(payload: StudentAssignRequest) -> StudentAssignResult:
+    normalized_usn = _normalize_usn(payload.usn)
+    try:
+        existing = get_student_assignment_by_usn_mongo(normalized_usn)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if existing is not None:
+        return StudentAssignResult(status="duplicate", assignment=_to_student_assignment_response(existing))
+
+    rows = list_student_assignments_mongo()
+    assigned_ids = {str(row["task_id"]) for row in rows}
+    unassigned_ids = [task_id for task_id in _student_task_ids if task_id not in assigned_ids]
+    pool = unassigned_ids if len(unassigned_ids) > 0 else _student_task_ids
+    random_task_id = pool[random.randrange(len(pool))]
+
+    row = create_student_assignment_mongo(name=payload.name.strip(), usn=normalized_usn, task_id=random_task_id)
+    return StudentAssignResult(status="created", assignment=_to_student_assignment_response(row))
+
+
+@app.put("/api/assignments/{usn}/task", response_model=StudentAssignmentResponse)
+def reassign_student_task(usn: str, payload: StudentReassignRequest) -> StudentAssignmentResponse:
+    normalized_usn = _normalize_usn(usn)
+    task_id = payload.task_id.strip().upper()
+    if task_id not in _student_task_ids:
+        raise HTTPException(status_code=422, detail="Invalid task id")
+
+    try:
+        row = update_student_assignment_task_mongo(normalized_usn, task_id)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student assignment not found")
+    return _to_student_assignment_response(row)
 
 
 def _try_cast(value: str) -> object | None:
