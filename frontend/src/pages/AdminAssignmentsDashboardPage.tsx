@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import { seedStudentsFromSqlite } from '../services/students'
 import { fetchStudents } from '../services/students'
 import {
+  adminSetStudentTaskControl,
   adminResetStudentPassword,
   exportAssignmentsCsv,
   getAssignmentMode,
@@ -14,6 +15,11 @@ import {
   type StudentTaskType,
 } from '../services/taskAssignments'
 
+type RowControlState = {
+  taskId: string
+  lockTask: boolean
+}
+
 export default function AdminAssignmentsDashboardPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | StudentTaskType>('all')
@@ -21,6 +27,8 @@ export default function AdminAssignmentsDashboardPage() {
   const [syncMessage, setSyncMessage] = useState('')
   const [resetUsn, setResetUsn] = useState('')
   const [resetMessage, setResetMessage] = useState('')
+  const [rowActionMessage, setRowActionMessage] = useState('')
+  const [rowControls, setRowControls] = useState<Record<string, RowControlState>>({})
   const queryClient = useQueryClient()
   const assignmentsQuery = useQuery({
     queryKey: ['student-assignments', 'admin-dashboard'],
@@ -62,6 +70,22 @@ export default function AdminAssignmentsDashboardPage() {
       setResetMessage('Could not reset password. Verify USN and admin session.')
     },
   })
+  const taskControlMutation = useMutation({
+    mutationFn: ({ usn, taskId, lockTask }: { usn: string; taskId: string; lockTask: boolean }) =>
+      adminSetStudentTaskControl(usn, taskId, lockTask),
+    onSuccess: async (result) => {
+      setRowActionMessage(
+        `Updated ${result.usn}: task ${result.taskId} (${result.taskLocked ? 'locked' : 'unlocked'}).`,
+      )
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['student-assignments', 'admin-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['students', 'admin-dashboard'] }),
+      ])
+    },
+    onError: () => {
+      setRowActionMessage('Could not update task control for this student.')
+    },
+  })
 
   const assignmentMode = modeQuery.data ?? 'self-assign'
   const allAssignments = assignmentsQuery.data ?? []
@@ -73,6 +97,33 @@ export default function AdminAssignmentsDashboardPage() {
     }
     return map
   }, [studentsQuery.data])
+
+  const studentTaskLockByUsn = useMemo(() => {
+    const rows = studentsQuery.data ?? []
+    const map = new Map<string, boolean>()
+    for (const row of rows) {
+      map.set(row.usn, row.task_locked)
+    }
+    return map
+  }, [studentsQuery.data])
+
+  useEffect(() => {
+    if (!allAssignments.length) {
+      return
+    }
+    setRowControls((previous) => {
+      const next = { ...previous }
+      for (const assignment of allAssignments) {
+        if (!next[assignment.usn]) {
+          next[assignment.usn] = {
+            taskId: assignment.taskId,
+            lockTask: studentTaskLockByUsn.get(assignment.usn) ?? false,
+          }
+        }
+      }
+      return next
+    })
+  }, [allAssignments, studentTaskLockByUsn])
 
   const filteredAssignments = useMemo(() => {
     const searchTerm = search.trim().toLowerCase()
@@ -276,11 +327,13 @@ export default function AdminAssignmentsDashboardPage() {
                   <th>Name</th>
                   <th>USN</th>
                   <th>Password Status</th>
+                  <th>Task Lock</th>
                   <th>Task ID</th>
                   <th>Type</th>
                   <th>Title</th>
                   <th>Details</th>
                   <th>Assigned At</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -288,17 +341,88 @@ export default function AdminAssignmentsDashboardPage() {
                   const mustChange = studentStatusByUsn.get(assignment.usn)
                   const passwordStatus =
                     mustChange === undefined ? 'unknown' : mustChange ? 'default/reset-required' : 'changed'
+                  const control = rowControls[assignment.usn] ?? {
+                    taskId: assignment.taskId,
+                    lockTask: studentTaskLockByUsn.get(assignment.usn) ?? false,
+                  }
                   const task = getTaskById(assignment.taskId)
                   return (
                     <tr key={assignment.usn}>
                       <td>{assignment.name}</td>
                       <td>{assignment.usn}</td>
                       <td>{passwordStatus}</td>
+                      <td>{control.lockTask ? 'Locked' : 'Open'}</td>
                       <td>{task?.id ?? assignment.taskId}</td>
                       <td>{task?.type ?? 'unknown'}</td>
                       <td>{task?.title ?? 'Task unavailable'}</td>
                       <td>{task?.details ?? 'No task details found.'}</td>
                       <td>{new Date(assignment.assignedAt).toLocaleString()}</td>
+                      <td>
+                        <div className="assignment-form">
+                          <select
+                            value={control.taskId}
+                            onChange={(event) => {
+                              const value = event.target.value
+                              setRowControls((previous) => ({
+                                ...previous,
+                                [assignment.usn]: {
+                                  ...(previous[assignment.usn] ?? control),
+                                  taskId: value,
+                                },
+                              }))
+                            }}
+                          >
+                            {STUDENT_TASKS.map((taskOption) => (
+                              <option key={taskOption.id} value={taskOption.id}>
+                                {taskOption.id}
+                              </option>
+                            ))}
+                          </select>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={control.lockTask}
+                              onChange={(event) => {
+                                const value = event.target.checked
+                                setRowControls((previous) => ({
+                                  ...previous,
+                                  [assignment.usn]: {
+                                    ...(previous[assignment.usn] ?? control),
+                                    lockTask: value,
+                                  },
+                                }))
+                              }}
+                            />
+                            Lock
+                          </label>
+                          <button
+                            type="button"
+                            className="button-link secondary"
+                            disabled={taskControlMutation.isPending}
+                            onClick={() => {
+                              setRowActionMessage('')
+                              taskControlMutation.mutate({
+                                usn: assignment.usn,
+                                taskId: control.taskId,
+                                lockTask: control.lockTask,
+                              })
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="button-link secondary"
+                            disabled={resetPasswordMutation.isPending}
+                            onClick={() => {
+                              setRowActionMessage('')
+                              resetPasswordMutation.mutate(assignment.usn)
+                            }}
+                          >
+                            Reset Password
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -306,6 +430,7 @@ export default function AdminAssignmentsDashboardPage() {
             </table>
           </div>
         )}
+        {rowActionMessage && <p>{rowActionMessage}</p>}
       </section>
     </ModulePage>
   )

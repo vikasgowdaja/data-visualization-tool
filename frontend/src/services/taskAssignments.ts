@@ -73,9 +73,22 @@ export type StudentPasswordChangeResult = {
   passwordChanged: boolean
 }
 
+export type StudentProfileUpdateResult = {
+  usn: string
+  name: string
+  nameChanged: boolean
+  passwordChanged: boolean
+}
+
 export type AdminResetStudentPasswordResult = {
   usn: string
   resetToDefault: boolean
+}
+
+export type AdminTaskControlResult = {
+  usn: string
+  taskId: string
+  taskLocked: boolean
 }
 
 export const STUDENT_TASKS: StudentTask[] = [
@@ -317,6 +330,31 @@ export async function changeStudentPassword(
   }
 }
 
+export async function updateStudentProfile(
+  usn: string,
+  currentPassword: string,
+  newName?: string,
+  newPassword?: string,
+): Promise<StudentProfileUpdateResult> {
+  const response = await axios.post<{
+    usn: string
+    name: string
+    name_changed: boolean
+    password_changed: boolean
+  }>(`${API_BASE}/students/update-profile`, {
+    usn,
+    current_password: currentPassword,
+    new_name: newName?.trim() ? newName.trim() : null,
+    new_password: newPassword?.trim() ? newPassword : null,
+  })
+  return {
+    usn: response.data.usn,
+    name: response.data.name,
+    nameChanged: response.data.name_changed,
+    passwordChanged: response.data.password_changed,
+  }
+}
+
 export async function adminResetStudentPassword(usn: string): Promise<AdminResetStudentPasswordResult> {
   const response = await axios.post<{ usn: string; reset_to_default: boolean }>(
     `${API_BASE}/students/${encodeURIComponent(usn)}/reset-password`,
@@ -328,6 +366,28 @@ export async function adminResetStudentPassword(usn: string): Promise<AdminReset
   return {
     usn: response.data.usn,
     resetToDefault: response.data.reset_to_default,
+  }
+}
+
+export async function adminSetStudentTaskControl(
+  usn: string,
+  taskId: string,
+  lockTask: boolean,
+): Promise<AdminTaskControlResult> {
+  const response = await axios.put<{ usn: string; task_id: string; task_locked: boolean }>(
+    `${API_BASE}/students/${encodeURIComponent(usn)}/task-control`,
+    {
+      task_id: taskId,
+      lock_task: lockTask,
+    },
+    {
+      headers: getAdminAuthHeaders(),
+    },
+  )
+  return {
+    usn: response.data.usn,
+    taskId: response.data.task_id,
+    taskLocked: response.data.task_locked,
   }
 }
 

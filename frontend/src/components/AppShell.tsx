@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { clearAdminToken, getAdminToken } from '../services/adminAuth'
+import { clearStudentSession, getStudentSession } from '../services/studentAuth'
 import { saveLastModule } from '../services/studentState'
 
 type NavItem = {
@@ -30,6 +31,7 @@ const pathToLabel: Record<string, string> = {
   '/learning-path': 'Learning Path',
   '/resources': 'Resources',
   '/progress': 'Progress',
+  '/student-login': 'Student Login',
   '/task-assignment': 'Task Assignment',
   '/admin-login': 'Admin Login',
   '/admin-assignments': 'Admin Dashboard',
@@ -40,16 +42,24 @@ export default function AppShell({ navItems, children }: AppShellProps) {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [hasAdminSession, setHasAdminSession] = useState(getAdminToken().length > 0)
+  const [studentUsn, setStudentUsn] = useState(getStudentSession()?.usn ?? '')
 
   useEffect(() => {
     saveLastModule(location.pathname)
     setHasAdminSession(getAdminToken().length > 0)
+    setStudentUsn(getStudentSession()?.usn ?? '')
   }, [location.pathname])
 
   const handleAdminLogout = () => {
     clearAdminToken()
     setHasAdminSession(false)
     navigate('/admin-login')
+  }
+
+  const handleStudentLogout = () => {
+    clearStudentSession()
+    setStudentUsn('')
+    navigate('/student-login')
   }
 
   const currentModule = useMemo(() => pathToLabel[location.pathname] ?? 'Module', [location.pathname])
@@ -95,6 +105,14 @@ export default function AppShell({ navItems, children }: AppShellProps) {
             <p className="breadcrumbs">{breadcrumbs.join(' / ')}</p>
             <h1 className="module-indicator">{currentModule}</h1>
           </div>
+          {studentUsn && (
+            <div className="profile-chip" aria-label="Student profile">
+              <span>Student: {studentUsn}</span>
+              <button type="button" className="button-link secondary" onClick={handleStudentLogout}>
+                Student Logout
+              </button>
+            </div>
+          )}
           {hasAdminSession && (
             <button type="button" className="button-link secondary" onClick={handleAdminLogout}>
               Admin Logout

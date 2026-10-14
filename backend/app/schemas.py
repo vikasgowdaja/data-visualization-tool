@@ -177,6 +177,20 @@ class StudentChangePasswordResponse(BaseModel):
     password_changed: bool
 
 
+class StudentUpdateProfileRequest(BaseModel):
+    usn: str = Field(min_length=1, max_length=60)
+    current_password: str = Field(min_length=1, max_length=120)
+    new_name: str | None = Field(default=None, max_length=120)
+    new_password: str | None = Field(default=None, max_length=120)
+
+
+class StudentUpdateProfileResponse(BaseModel):
+    usn: str
+    name: str
+    name_changed: bool
+    password_changed: bool
+
+
 class AdminResetStudentPasswordResponse(BaseModel):
     usn: str
     reset_to_default: bool
@@ -217,6 +231,18 @@ class StudentRecordResponse(BaseModel):
     assigned_at: str
     updated_at: str
     password_must_change: bool
+    task_locked: bool
+
+
+class StudentTaskControlRequest(BaseModel):
+    task_id: str = Field(min_length=1, max_length=20)
+    lock_task: bool = False
+
+
+class StudentTaskControlResponse(BaseModel):
+    usn: str
+    task_id: str
+    task_locked: bool
 
 
 class SeedStudentsResponse(BaseModel):

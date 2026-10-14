@@ -65,7 +65,7 @@ export default function TaskAssignmentPage() {
   const [studentLoggedInUsn, setStudentLoggedInUsn] = useState('')
   const [studentRecoveryTask, setStudentRecoveryTask] = useState('S01')
   const [cachedRecoveredTask, setCachedRecoveredTask] = useState('')
-  const [studentLoginMessage, setStudentLoginMessage] = useState('Login with USN as username and password to verify/recover your assignment.')
+  const [studentLoginMessage, setStudentLoginMessage] = useState('Login with your student credentials to verify/recover your assignment.')
   const [showRecoveryChooser, setShowRecoveryChooser] = useState(false)
   const [mustChangePassword, setMustChangePassword] = useState(false)
   const [studentProfileName, setStudentProfileName] = useState('')
@@ -253,7 +253,7 @@ export default function TaskAssignmentPage() {
       setStudentLoginMessage(result.message)
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
-        setStudentLoginMessage('Invalid login. Use the same USN for username and password.')
+        setStudentLoginMessage('Invalid login credentials.')
         return
       }
       setStudentLoginMessage('Login failed. Please try again.')
@@ -320,7 +320,7 @@ export default function TaskAssignmentPage() {
         return
       }
       if (axios.isAxiosError(error) && error.response?.status === 401) {
-        setStudentLoginMessage('Student authentication failed. Use USN as both username and password.')
+        setStudentLoginMessage('Student authentication failed. Check your credentials and retry.')
         return
       }
       setStudentLoginMessage('Could not recover assignment right now.')

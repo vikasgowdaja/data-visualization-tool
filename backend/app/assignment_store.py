@@ -100,6 +100,7 @@ def _normalize_student(doc: dict[str, Any]) -> dict[str, str]:
         "assigned_at": str(doc.get("assigned_at", "")),
         "updated_at": str(doc.get("updated_at", "")),
         "password_must_change": bool(doc.get("password_must_change", True)),
+        "task_locked": bool(doc.get("task_locked", False)),
     }
 
 
@@ -120,6 +121,7 @@ def _normalize_student_auth(doc: dict[str, Any]) -> dict[str, Any]:
         "assigned_at": str(doc.get("assigned_at", "")),
         "password_hash": str(doc.get("password_hash", "")),
         "password_must_change": bool(doc.get("password_must_change", True)),
+        "task_locked": bool(doc.get("task_locked", False)),
     }
 
 
@@ -139,11 +141,12 @@ def upsert_student_record_mongo(name: str, usn: str, task_id: str, assigned_at: 
                 "created_at": now,
                 "password_hash": _hash_student_password(normalized_usn, _default_student_password(normalized_usn)),
                 "password_must_change": True,
+                "task_locked": False,
             },
         },
         upsert=True,
         return_document=ReturnDocument.AFTER,
-        projection={"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1},
+        projection={"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1, "task_locked": 1},
     )
     if doc is None:
         raise RuntimeError("Failed to upsert student record")
@@ -162,6 +165,7 @@ def get_student_auth_record_mongo(usn: str) -> dict[str, Any] | None:
             "assigned_at": 1,
             "password_hash": 1,
             "password_must_change": 1,
+            "task_locked": 1,
         },
     )
     if doc is None:
@@ -204,10 +208,46 @@ def reset_student_password_to_default_mongo(usn: str) -> bool:
     return set_student_password_mongo(normalized_usn, _default_student_password(normalized_usn), force_must_change=True)
 
 
+def update_student_name_mongo(usn: str, new_name: str) -> bool:
+    normalized_usn = usn.strip().upper()
+    cleaned_name = new_name.strip()
+    if not cleaned_name:
+        return False
+
+    now = datetime.now(tz=timezone.utc).isoformat()
+    student_result = _students_collection().update_one(
+        {"usn": normalized_usn},
+        {
+            "$set": {
+                "name": cleaned_name,
+                "updated_at": now,
+            }
+        },
+    )
+    _assignments_collection().update_one(
+        {"usn": normalized_usn},
+        {
+            "$set": {
+                "name": cleaned_name,
+            }
+        },
+    )
+    return student_result.matched_count > 0
+
+
 def list_students_mongo() -> list[dict[str, str]]:
     cursor = _students_collection().find(
         {},
-        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1, "password_must_change": 1},
+        {
+            "_id": 0,
+            "name": 1,
+            "usn": 1,
+            "task_id": 1,
+            "assigned_at": 1,
+            "updated_at": 1,
+            "password_must_change": 1,
+            "task_locked": 1,
+        },
     ).sort("usn", 1)
     return [_normalize_student(doc) for doc in cursor]
 
@@ -215,7 +255,16 @@ def list_students_mongo() -> list[dict[str, str]]:
 def get_student_by_usn_mongo(usn: str) -> dict[str, str] | None:
     doc = _students_collection().find_one(
         {"usn": usn},
-        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1, "password_must_change": 1},
+        {
+            "_id": 0,
+            "name": 1,
+            "usn": 1,
+            "task_id": 1,
+            "assigned_at": 1,
+            "updated_at": 1,
+            "password_must_change": 1,
+            "task_locked": 1,
+        },
     )
     if doc is None:
         return None
@@ -292,6 +341,44 @@ def update_student_assignment_task_mongo(usn: str, task_id: str) -> dict[str, st
         assigned_at=normalized["assigned_at"],
     )
     return normalized
+
+
+def set_student_task_control_mongo(usn: str, task_id: str, lock_task: bool) -> dict[str, Any] | None:
+    normalized_usn = usn.strip().upper()
+    now = datetime.now(tz=timezone.utc).isoformat()
+
+    assignment_doc = _assignments_collection().find_one_and_update(
+        {"usn": normalized_usn},
+        {
+            "$set": {
+                "task_id": task_id,
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1},
+    )
+    if assignment_doc is None:
+        return None
+
+    student_doc = _students_collection().find_one_and_update(
+        {"usn": normalized_usn},
+        {
+            "$set": {
+                "task_id": task_id,
+                "task_locked": lock_task,
+                "updated_at": now,
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "usn": 1, "task_id": 1, "task_locked": 1},
+    )
+    if student_doc is None:
+        return None
+    return {
+        "usn": str(student_doc.get("usn", normalized_usn)),
+        "task_id": str(student_doc.get("task_id", task_id)),
+        "task_locked": bool(student_doc.get("task_locked", lock_task)),
+    }
 
 
 def get_assignment_mode_mongo() -> str:
