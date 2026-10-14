@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { seedStudentsFromSqlite } from '../services/students'
 import {
   exportAssignmentsCsv,
   getAssignmentMode,
@@ -35,6 +36,8 @@ export default function AdminAssignmentsDashboardPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | StudentTaskType>('all')
   const [taskFilter, setTaskFilter] = useState<'all' | string>('all')
+  const [syncMessage, setSyncMessage] = useState('')
+  const queryClient = useQueryClient()
   const assignmentsQuery = useQuery({
     queryKey: ['student-assignments', 'admin-dashboard'],
     queryFn: listStudentAssignments,
@@ -44,6 +47,21 @@ export default function AdminAssignmentsDashboardPage() {
     queryKey: ['assignment-mode', 'admin-dashboard'],
     queryFn: getAssignmentMode,
     refetchInterval: 3000,
+  })
+  const syncMutation = useMutation({
+    mutationFn: seedStudentsFromSqlite,
+    onSuccess: async (result) => {
+      setSyncMessage(
+        `Sync complete. Students synced: ${result.students_synced}, assignments synced: ${result.assignments_synced}.`,
+      )
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['student-assignments', 'admin-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['assignment-mode', 'admin-dashboard'] }),
+      ])
+    },
+    onError: () => {
+      setSyncMessage('Sync failed. Ensure admin session is valid and backend can access both databases.')
+    },
   })
 
   const assignmentMode = modeQuery.data ?? 'self-assign'
@@ -196,10 +214,22 @@ export default function AdminAssignmentsDashboardPage() {
           <button type="button" className="button-link secondary" onClick={handleExportCsv}>
             Export CSV
           </button>
+          <button
+            type="button"
+            className="button-link secondary"
+            onClick={() => {
+              setSyncMessage('')
+              syncMutation.mutate()
+            }}
+            disabled={syncMutation.isPending}
+          >
+            {syncMutation.isPending ? 'Syncing...' : 'Sync SQLite to MongoDB'}
+          </button>
           <Link className="button-link secondary" to="/task-assignment">
             Manage Assignments
           </Link>
         </div>
+        {syncMessage && <p>{syncMessage}</p>}
       </section>
 
       <section className="card">

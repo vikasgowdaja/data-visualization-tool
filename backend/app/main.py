@@ -545,7 +545,11 @@ def seed_students_from_sqlite(_admin: str = Depends(require_admin_user)) -> Seed
         result = seed_students_from_rows_mongo(rows)
     except RuntimeError as exc:
         _raise_assignment_backend_unavailable(exc)
-    return SeedStudentsResponse(seeded=result["seeded"])
+    return SeedStudentsResponse(
+        seeded=result["seeded"],
+        students_synced=result.get("students_synced", result["seeded"]),
+        assignments_synced=result.get("assignments_synced", result["seeded"]),
+    )
 
 
 def _try_cast(value: str) -> object | None:

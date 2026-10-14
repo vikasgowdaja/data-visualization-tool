@@ -12,6 +12,8 @@ export type StudentRecord = {
 
 export type SeedStudentsResult = {
   seeded: number
+  students_synced: number
+  assignments_synced: number
 }
 
 export async function fetchStudents(): Promise<StudentRecord[]> {

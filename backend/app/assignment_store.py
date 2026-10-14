@@ -70,6 +70,25 @@ def _normalize_row(doc: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def upsert_assignment_record_mongo(name: str, usn: str, task_id: str, assigned_at: str) -> dict[str, str]:
+    doc = _assignments_collection().find_one_and_update(
+        {"usn": usn},
+        {
+            "$set": {
+                "name": name,
+                "task_id": task_id,
+                "assigned_at": assigned_at,
+            }
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1},
+    )
+    if doc is None:
+        raise RuntimeError("Failed to upsert assignment record")
+    return _normalize_row(doc)
+
+
 def _normalize_student(doc: dict[str, Any]) -> dict[str, str]:
     return {
         "name": str(doc.get("name", "")),
@@ -123,16 +142,30 @@ def get_student_by_usn_mongo(usn: str) -> dict[str, str] | None:
 
 
 def seed_students_from_rows_mongo(rows: list[dict[str, str]]) -> dict[str, int]:
-    inserted_or_updated = 0
+    synced_students = 0
+    synced_assignments = 0
     for row in rows:
+        upsert_assignment_record_mongo(
+            name=row["name"],
+            usn=row["usn"],
+            task_id=row["task_id"],
+            assigned_at=row["assigned_at"],
+        )
+        synced_assignments += 1
+
         upsert_student_record_mongo(
             name=row["name"],
             usn=row["usn"],
             task_id=row["task_id"],
             assigned_at=row["assigned_at"],
         )
-        inserted_or_updated += 1
-    return {"seeded": inserted_or_updated}
+        synced_students += 1
+
+    return {
+        "seeded": synced_students,
+        "students_synced": synced_students,
+        "assignments_synced": synced_assignments,
+    }
 
 
 def list_student_assignments_mongo() -> list[dict[str, str]]:
@@ -151,21 +184,20 @@ def get_student_assignment_by_usn_mongo(usn: str) -> dict[str, str] | None:
 
 
 def create_student_assignment_mongo(name: str, usn: str, task_id: str) -> dict[str, str]:
-    payload = {
-        "name": name,
-        "usn": usn,
-        "task_id": task_id,
-        "assigned_at": datetime.now(tz=timezone.utc).isoformat(),
-    }
-    _assignments_collection().insert_one(payload)
-    upsert_student_record_mongo(name=name, usn=usn, task_id=task_id, assigned_at=payload["assigned_at"])
-    return _normalize_row(payload)
+    assigned_at = datetime.now(tz=timezone.utc).isoformat()
+    assignment = upsert_assignment_record_mongo(name=name, usn=usn, task_id=task_id, assigned_at=assigned_at)
+    upsert_student_record_mongo(name=name, usn=usn, task_id=task_id, assigned_at=assignment["assigned_at"])
+    return assignment
 
 
 def update_student_assignment_task_mongo(usn: str, task_id: str) -> dict[str, str] | None:
     doc = _assignments_collection().find_one_and_update(
         {"usn": usn},
-        {"$set": {"task_id": task_id}},
+        {
+            "$set": {
+                "task_id": task_id,
+            }
+        },
         return_document=ReturnDocument.AFTER,
         projection={"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1},
     )

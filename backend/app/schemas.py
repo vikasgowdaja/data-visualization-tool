@@ -174,3 +174,5 @@ class StudentRecordResponse(BaseModel):
 
 class SeedStudentsResponse(BaseModel):
     seeded: int
+    students_synced: int = 0
+    assignments_synced: int = 0
