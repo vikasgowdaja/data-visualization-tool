@@ -8,6 +8,7 @@ export type StudentRecord = {
   task_id: string
   assigned_at: string
   updated_at: string
+  password_must_change: boolean
 }
 
 export type SeedStudentsResult = {

@@ -99,6 +99,7 @@ def _normalize_student(doc: dict[str, Any]) -> dict[str, str]:
         "task_id": str(doc.get("task_id", "")),
         "assigned_at": str(doc.get("assigned_at", "")),
         "updated_at": str(doc.get("updated_at", "")),
+        "password_must_change": bool(doc.get("password_must_change", True)),
     }
 
 
@@ -206,7 +207,7 @@ def reset_student_password_to_default_mongo(usn: str) -> bool:
 def list_students_mongo() -> list[dict[str, str]]:
     cursor = _students_collection().find(
         {},
-        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1},
+        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1, "password_must_change": 1},
     ).sort("usn", 1)
     return [_normalize_student(doc) for doc in cursor]
 
@@ -214,7 +215,7 @@ def list_students_mongo() -> list[dict[str, str]]:
 def get_student_by_usn_mongo(usn: str) -> dict[str, str] | None:
     doc = _students_collection().find_one(
         {"usn": usn},
-        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1},
+        {"_id": 0, "name": 1, "usn": 1, "task_id": 1, "assigned_at": 1, "updated_at": 1, "password_must_change": 1},
     )
     if doc is None:
         return None

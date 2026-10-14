@@ -452,6 +452,7 @@ def _to_student_record_response(row) -> StudentRecordResponse:
         task_id=row["task_id"],
         assigned_at=row["assigned_at"],
         updated_at=row["updated_at"],
+        password_must_change=bool(row.get("password_must_change", True)),
     )
 
 

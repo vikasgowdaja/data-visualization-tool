@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
 import { seedStudentsFromSqlite } from '../services/students'
+import { fetchStudents } from '../services/students'
 import {
   adminResetStudentPassword,
   exportAssignmentsCsv,
@@ -10,28 +11,8 @@ import {
   getTaskById,
   listStudentAssignments,
   STUDENT_TASKS,
-  type StudentAssignment,
   type StudentTaskType,
 } from '../services/taskAssignments'
-
-type AssignmentRowProps = {
-  assignment: StudentAssignment
-}
-
-function AssignmentRow({ assignment }: AssignmentRowProps) {
-  const task = getTaskById(assignment.taskId)
-  return (
-    <tr>
-      <td>{assignment.name}</td>
-      <td>{assignment.usn}</td>
-      <td>{task?.id ?? assignment.taskId}</td>
-      <td>{task?.type ?? 'unknown'}</td>
-      <td>{task?.title ?? 'Task unavailable'}</td>
-      <td>{task?.details ?? 'No task details found.'}</td>
-      <td>{new Date(assignment.assignedAt).toLocaleString()}</td>
-    </tr>
-  )
-}
 
 export default function AdminAssignmentsDashboardPage() {
   const [search, setSearch] = useState('')
@@ -49,6 +30,11 @@ export default function AdminAssignmentsDashboardPage() {
   const modeQuery = useQuery({
     queryKey: ['assignment-mode', 'admin-dashboard'],
     queryFn: getAssignmentMode,
+    refetchInterval: 3000,
+  })
+  const studentsQuery = useQuery({
+    queryKey: ['students', 'admin-dashboard'],
+    queryFn: fetchStudents,
     refetchInterval: 3000,
   })
   const syncMutation = useMutation({
@@ -79,6 +65,14 @@ export default function AdminAssignmentsDashboardPage() {
 
   const assignmentMode = modeQuery.data ?? 'self-assign'
   const allAssignments = assignmentsQuery.data ?? []
+  const studentStatusByUsn = useMemo(() => {
+    const rows = studentsQuery.data ?? []
+    const map = new Map<string, boolean>()
+    for (const row of rows) {
+      map.set(row.usn, row.password_must_change)
+    }
+    return map
+  }, [studentsQuery.data])
 
   const filteredAssignments = useMemo(() => {
     const searchTerm = search.trim().toLowerCase()
@@ -281,6 +275,7 @@ export default function AdminAssignmentsDashboardPage() {
                 <tr>
                   <th>Name</th>
                   <th>USN</th>
+                  <th>Password Status</th>
                   <th>Task ID</th>
                   <th>Type</th>
                   <th>Title</th>
@@ -289,9 +284,24 @@ export default function AdminAssignmentsDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAssignments.map((assignment) => (
-                  <AssignmentRow key={assignment.usn} assignment={assignment} />
-                ))}
+                {filteredAssignments.map((assignment) => {
+                  const mustChange = studentStatusByUsn.get(assignment.usn)
+                  const passwordStatus =
+                    mustChange === undefined ? 'unknown' : mustChange ? 'default/reset-required' : 'changed'
+                  const task = getTaskById(assignment.taskId)
+                  return (
+                    <tr key={assignment.usn}>
+                      <td>{assignment.name}</td>
+                      <td>{assignment.usn}</td>
+                      <td>{passwordStatus}</td>
+                      <td>{task?.id ?? assignment.taskId}</td>
+                      <td>{task?.type ?? 'unknown'}</td>
+                      <td>{task?.title ?? 'Task unavailable'}</td>
+                      <td>{task?.details ?? 'No task details found.'}</td>
+                      <td>{new Date(assignment.assignedAt).toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

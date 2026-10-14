@@ -216,6 +216,7 @@ class StudentRecordResponse(BaseModel):
     task_id: str
     assigned_at: str
     updated_at: str
+    password_must_change: bool
 
 
 class SeedStudentsResponse(BaseModel):
