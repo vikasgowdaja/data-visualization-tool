@@ -72,30 +72,30 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_dataset_versions_name_version ON dataset_versions(dataset_name, version_number DESC)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_progress_events_module ON progress_events(module)")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS student_assignments (
-                    usn TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    task_id TEXT NOT NULL,
-                    assigned_at TEXT NOT NULL
-                )
-                """
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS student_assignments (
+                usn TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                task_id TEXT NOT NULL,
+                assigned_at TEXT NOT NULL
             )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS assignment_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS assignment_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )
-            conn.execute(
-                "INSERT OR IGNORE INTO assignment_settings (key, value, updated_at) VALUES (?, ?, ?)",
-                ("assignment_mode", "self-assign", datetime.now(tz=timezone.utc).isoformat()),
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_student_assignments_task_id ON student_assignments(task_id)")
+            """
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO assignment_settings (key, value, updated_at) VALUES (?, ?, ?)",
+            ("assignment_mode", "self-assign", datetime.now(tz=timezone.utc).isoformat()),
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_student_assignments_task_id ON student_assignments(task_id)")
         conn.commit()
     finally:
         conn.close()
