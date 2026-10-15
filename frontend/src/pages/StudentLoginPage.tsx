@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { getStudentTaskSnapshot, saveLastStudentUsn } from '../services/studentState'
 import { clearStudentSession, saveStudentSession } from '../services/studentAuth'
 import { loginStudentByUsn, updateStudentProfile } from '../services/taskAssignments'
@@ -43,12 +44,12 @@ export default function StudentLoginPage() {
 
       if (result.assignmentFound) {
         setMessage('Login successful. Redirecting to dashboard.')
-        navigate('/dashboard')
+        navigate(ROUTES.DASHBOARD)
         return
       }
 
       setMessage('Login successful, but assignment record is missing. Please recover your task assignment.')
-      navigate('/task-assignment')
+      navigate(ROUTES.TASK_ASSIGNMENT)
     } catch {
       clearStudentSession()
       setMessage('Invalid student credentials.')
@@ -100,7 +101,7 @@ export default function StudentLoginPage() {
       setNewPassword('')
       setConfirmPassword('')
       setMessage('Profile updated successfully. Redirecting to dashboard.')
-      navigate('/dashboard')
+      navigate(ROUTES.DASHBOARD)
     } catch {
       setMessage('Profile update failed. Verify your current credentials and retry.')
     }
@@ -112,7 +113,7 @@ export default function StudentLoginPage() {
       purpose="Login with your student credentials to view and continue your assigned work."
       status="available"
       nextActionLabel="Open Task Assignment"
-      nextActionTo="/task-assignment"
+      nextActionTo={ROUTES.TASK_ASSIGNMENT}
     >
       <section className="card assignment-page-grid">
         <div>

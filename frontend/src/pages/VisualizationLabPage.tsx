@@ -23,6 +23,7 @@ import {
   YAxis,
 } from 'recharts'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchAllRows } from '../services/explorer'
 import { logProgressEvent } from '../services/platform'
@@ -240,7 +241,7 @@ export default function VisualizationLabPage() {
       purpose="Choose valid chart forms, configure them properly, and interpret analytical meaning."
       status="available"
       nextActionLabel="Move to Insights Lab"
-      nextActionTo="/insights-lab"
+      nextActionTo={ROUTES.INSIGHTS_LAB}
     >
       <section className="card">
         <h3>Help Me Choose a Chart</h3>

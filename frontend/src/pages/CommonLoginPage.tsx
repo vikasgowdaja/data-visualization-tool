@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { loginAdmin, setAdminToken } from '../services/adminAuth'
 import { saveStudentSession } from '../services/studentAuth'
 import { saveLastStudentUsn } from '../services/studentState'
@@ -29,7 +30,7 @@ export default function CommonLoginPage() {
       if (profile === 'admin') {
         const result = await loginAdmin(username.trim(), password)
         setAdminToken(result.token)
-        navigate('/admin-assignments')
+        navigate(ROUTES.ADMIN_ASSIGNMENTS)
         return
       }
 
@@ -43,14 +44,14 @@ export default function CommonLoginPage() {
 
       if (student.mustChangePassword) {
         setMessage('First login requires password change. Redirecting to Student Login page...')
-        navigate('/student-login')
+        navigate(ROUTES.STUDENT_LOGIN)
         return
       }
 
       if (student.assignmentFound) {
-        navigate('/task-assignment')
+        navigate(ROUTES.TASK_ASSIGNMENT)
       } else {
-        navigate('/task-assignment')
+        navigate(ROUTES.TASK_ASSIGNMENT)
       }
     } catch {
       setMessage('Invalid credentials for selected profile.')
@@ -65,7 +66,7 @@ export default function CommonLoginPage() {
       purpose="Common entry point for Student and Admin users."
       status="available"
       nextActionLabel="Open Student Task Portal"
-      nextActionTo="/task-assignment"
+      nextActionTo={ROUTES.TASK_ASSIGNMENT}
     >
       <section className="card assignment-page-grid">
         <div>

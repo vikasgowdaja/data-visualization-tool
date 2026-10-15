@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { resourcesCatalog } from '../features/learningContent'
 
 export default function ResourcesPage() {
@@ -9,7 +10,7 @@ export default function ResourcesPage() {
       purpose="Use practical references for cleaning, visualization, and interpretation decisions."
       status="available"
       nextActionLabel="Track Progress"
-      nextActionTo="/progress"
+      nextActionTo={ROUTES.PROGRESS}
     >
       <section className="card dataset-grid">
         {resourcesCatalog.map((resource) => (

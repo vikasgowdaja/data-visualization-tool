@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { loginAdmin, setAdminToken } from '../services/adminAuth'
 
 export default function AdminLoginPage() {
@@ -21,7 +22,7 @@ export default function AdminLoginPage() {
       setErrorText('')
       const result = await loginAdmin(username.trim(), password)
       setAdminToken(result.token)
-      navigate('/admin-assignments', { replace: true })
+      navigate(ROUTES.ADMIN_ASSIGNMENTS, { replace: true })
     } catch {
       setErrorText('Invalid admin credentials.')
     } finally {
@@ -35,7 +36,7 @@ export default function AdminLoginPage() {
       purpose="Authenticate once to access protected admin features."
       status="available"
       nextActionLabel="Back to Dashboard"
-      nextActionTo="/dashboard"
+      nextActionTo={ROUTES.DASHBOARD}
     >
       <section className="card assignment-page-grid">
         <div>
@@ -70,7 +71,7 @@ export default function AdminLoginPage() {
         <div>
           <h2>Need student access only?</h2>
           <p>Students can continue using open assignment and dashboard pages without admin login.</p>
-          <Link className="button-link secondary" to="/task-assignment">
+          <Link className="button-link secondary" to={ROUTES.TASK_ASSIGNMENT}>
             Open Task Assignment
           </Link>
         </div>

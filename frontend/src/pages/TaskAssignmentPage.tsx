@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { clearAdminToken, getAdminSession, getAdminToken } from '../services/adminAuth'
 import { getLastStudentUsn, getStudentTaskSnapshot, saveLastStudentUsn, saveStudentTaskSnapshot } from '../services/studentState'
 import {
@@ -351,7 +352,7 @@ export default function TaskAssignmentPage() {
       purpose="No-auth assignment portal: enter Name and USN, avoid duplicate registrations, and get a random task with full details."
       status="available"
       nextActionLabel="View Dashboard Assignment Board"
-      nextActionTo="/dashboard"
+      nextActionTo={ROUTES.DASHBOARD}
     >
       {isAdminAuthenticated ? (
         <section className="card mentor-controls">
@@ -407,7 +408,7 @@ export default function TaskAssignmentPage() {
           <h2>Admin Work</h2>
           <p>Admin-only assignment controls are available in the admin portal.</p>
           <p>
-            Login as admin from <Link to="/login">Common Login</Link> and open Admin Dashboard for management actions.
+            Login as admin from <Link to={ROUTES.LOGIN}>Common Login</Link> and open Admin Dashboard for management actions.
           </p>
         </section>
       )}

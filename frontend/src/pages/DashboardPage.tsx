@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchProgressSummary, listSessions } from '../services/platform'
 import { getLastDatasetTitle, getLastModule, getLastStudentUsn, saveLastStudentUsn } from '../services/studentState'
@@ -72,7 +73,7 @@ export default function DashboardPage() {
       purpose="Continue your real learning flow using current dataset and recent activity state."
       status="in-progress"
       nextActionLabel="Continue in Data Explorer"
-      nextActionTo="/data-explorer"
+      nextActionTo={ROUTES.DATA_EXPLORER}
     >
       <section className="card dashboard-grid">
         <div>
@@ -101,19 +102,19 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="quick-actions">
-          <Link className="button-link" to="/data-explorer">
+          <Link className="button-link" to={ROUTES.DATA_EXPLORER}>
             Explore Dataset
           </Link>
-          <Link className="button-link secondary" to="/visualization-lab">
+          <Link className="button-link secondary" to={ROUTES.VISUALIZATION_LAB}>
             Create Visualization
           </Link>
-          <Link className="button-link secondary" to="/practice">
+          <Link className="button-link secondary" to={ROUTES.PRACTICE}>
             Practice Questions
           </Link>
-          <Link className="button-link secondary" to="/challenges">
+          <Link className="button-link secondary" to={ROUTES.CHALLENGES}>
             Start Challenge
           </Link>
-          <Link className="button-link secondary" to="/task-assignment">
+          <Link className="button-link secondary" to={ROUTES.TASK_ASSIGNMENT}>
             Open Task Assignment
           </Link>
         </div>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { learningPathLevels } from '../features/learningContent'
 import { fetchProgressSummary } from '../services/platform'
 
@@ -17,7 +18,7 @@ export default function LearningPathPage() {
       purpose="Track progression from fundamentals to applied data science practice."
       status="available"
       nextActionLabel="Begin with Learn Module"
-      nextActionTo="/learn"
+      nextActionTo={ROUTES.LEARN}
     >
       <section className="card">
         <p>Total learning events captured: {eventCount}</p>

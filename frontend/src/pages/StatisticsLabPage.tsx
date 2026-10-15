@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { fetchRecentDatasets } from '../services/datasets'
 import { fetchDatasetProfile } from '../services/explorer'
 import '../App.css'
@@ -53,7 +54,7 @@ export default function StatisticsLabPage() {
       purpose="Interpret descriptive statistics with practical context and appropriate metric selection."
       status="available"
       nextActionLabel="Apply Insights"
-      nextActionTo="/insights-lab"
+      nextActionTo={ROUTES.INSIGHTS_LAB}
     >
       <section className="card">
         <div className="form-grid">

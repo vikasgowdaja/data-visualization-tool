@@ -1,4 +1,5 @@
 import ModulePage from '../components/ModulePage'
+import { ROUTES } from '../constants/routes'
 import { learningModules } from '../features/learningContent'
 import { logProgressEvent } from '../services/platform'
 
@@ -17,7 +18,7 @@ export default function LearnPage() {
       purpose="Connect concepts to practical labs using structured modules."
       status="in-progress"
       nextActionLabel="Open Data Explorer Activity"
-      nextActionTo="/data-explorer"
+      nextActionTo={ROUTES.DATA_EXPLORER}
     >
       <section className="card">
         <h2>Learning Modules</h2>
