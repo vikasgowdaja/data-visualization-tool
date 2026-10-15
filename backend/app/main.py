@@ -78,6 +78,8 @@ from .db import (
 )
 
 from .schemas import (
+    AdminStudentImpersonationUpdateRequest,
+    AdminStudentImpersonationUpdateResponse,
     AdminLoginRequest,
     AdminLoginResponse,
     AdminResetStudentPasswordResponse,
@@ -728,6 +730,70 @@ def admin_set_student_task_control(
         usn=row["usn"],
         task_id=row["task_id"],
         task_locked=bool(row.get("task_locked", False)),
+    )
+
+
+@app.put("/api/admin/students/{usn}/impersonate", response_model=AdminStudentImpersonationUpdateResponse)
+def admin_impersonate_student_update(
+    usn: str, payload: AdminStudentImpersonationUpdateRequest, _admin: str = Depends(require_admin_user)
+) -> AdminStudentImpersonationUpdateResponse:
+    normalized_usn = _normalize_usn(usn)
+
+    try:
+        student_row = get_student_by_usn_mongo(normalized_usn)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if student_row is None:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+
+    current_task_id = str(student_row["task_id"]).strip().upper()
+    current_task_locked = bool(student_row.get("task_locked", False))
+
+    requested_name = payload.new_name.strip() if payload.new_name is not None else None
+    requested_task_id = payload.task_id.strip().upper() if payload.task_id is not None else None
+    requested_lock_task = payload.lock_task if payload.lock_task is not None else current_task_locked
+
+    if requested_task_id is not None and requested_task_id not in _student_task_ids:
+        raise HTTPException(status_code=422, detail="Invalid task id")
+
+    if requested_name is None and requested_task_id is None and payload.lock_task is None:
+        raise HTTPException(status_code=422, detail="Provide at least one change: name, task_id, or lock_task")
+
+    name_changed = False
+    if requested_name is not None:
+        if requested_name == "":
+            raise HTTPException(status_code=422, detail="New name cannot be blank")
+        name_changed = update_student_name_mongo(normalized_usn, requested_name)
+        if not name_changed:
+            raise HTTPException(status_code=404, detail="Student profile not found")
+
+    task_id_to_apply = requested_task_id if requested_task_id is not None else current_task_id
+    task_changed = task_id_to_apply != current_task_id
+    lock_changed = requested_lock_task != current_task_locked
+
+    if task_changed or lock_changed:
+        try:
+            controlled = set_student_task_control_mongo(normalized_usn, task_id_to_apply, requested_lock_task)
+        except RuntimeError as exc:
+            _raise_assignment_backend_unavailable(exc)
+        if controlled is None:
+            raise HTTPException(status_code=404, detail="Student assignment not found")
+
+    try:
+        updated = get_student_by_usn_mongo(normalized_usn)
+    except RuntimeError as exc:
+        _raise_assignment_backend_unavailable(exc)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+
+    return AdminStudentImpersonationUpdateResponse(
+        usn=normalized_usn,
+        name=str(updated["name"]),
+        task_id=str(updated["task_id"]),
+        task_locked=bool(updated.get("task_locked", False)),
+        name_changed=name_changed,
+        task_changed=task_changed,
+        lock_changed=lock_changed,
     )
 
 

@@ -32,6 +32,11 @@ DATA_URI=sqlite:///var/data/lab.db
 Student task assignments are now stored centrally in MongoDB, not browser local storage.
 This allows admin dashboard and student views to share the same assignment records across devices and sessions.
 
+Admin APIs also support controlled student impersonation updates for mentor workflows:
+- update a student's display name
+- change assigned project/task ID
+- lock or unlock task changes
+
 ## Run
 
 ```powershell

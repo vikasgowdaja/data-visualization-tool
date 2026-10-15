@@ -5,7 +5,7 @@ import ModulePage from '../components/ModulePage'
 import { seedStudentsFromSqlite } from '../services/students'
 import { fetchStudents } from '../services/students'
 import {
-  adminSetStudentTaskControl,
+  adminImpersonateStudentUpdate,
   adminResetStudentPassword,
   exportAssignmentsCsv,
   getAssignmentMode,
@@ -60,6 +60,7 @@ function ResetIcon() {
 }
 
 type RowControlState = {
+  name: string
   taskId: string
   lockTask: boolean
 }
@@ -114,20 +115,40 @@ export default function AdminAssignmentsDashboardPage() {
       setResetMessage('Could not reset password. Verify USN and admin session.')
     },
   })
-  const taskControlMutation = useMutation({
-    mutationFn: ({ usn, taskId, lockTask }: { usn: string; taskId: string; lockTask: boolean }) =>
-      adminSetStudentTaskControl(usn, taskId, lockTask),
+  const impersonationMutation = useMutation({
+    mutationFn: ({ usn, name, taskId, lockTask }: { usn: string; name: string; taskId: string; lockTask: boolean }) =>
+      adminImpersonateStudentUpdate(usn, { newName: name, taskId, lockTask }),
     onSuccess: async (result) => {
+      const changedParts: string[] = []
+      if (result.nameChanged) {
+        changedParts.push('name')
+      }
+      if (result.taskChanged) {
+        changedParts.push('project/task')
+      }
+      if (result.lockChanged) {
+        changedParts.push(`lock (${result.taskLocked ? 'locked' : 'unlocked'})`)
+      }
       setRowActionMessage(
-        `Updated ${result.usn}: task ${result.taskId} (${result.taskLocked ? 'locked' : 'unlocked'}).`,
+        changedParts.length > 0
+          ? `Impersonation update saved for ${result.usn}: ${changedParts.join(', ')}.`
+          : `No changes were applied for ${result.usn}.`,
       )
+      setRowControls((previous) => ({
+        ...previous,
+        [result.usn]: {
+          name: result.name,
+          taskId: result.taskId,
+          lockTask: result.taskLocked,
+        },
+      }))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['student-assignments', 'admin-dashboard'] }),
         queryClient.invalidateQueries({ queryKey: ['students', 'admin-dashboard'] }),
       ])
     },
     onError: () => {
-      setRowActionMessage('Could not update task control for this student.')
+      setRowActionMessage('Could not apply impersonation update for this student.')
     },
   })
 
@@ -160,6 +181,7 @@ export default function AdminAssignmentsDashboardPage() {
       for (const assignment of allAssignments) {
         if (!next[assignment.usn]) {
           next[assignment.usn] = {
+            name: assignment.name,
             taskId: assignment.taskId,
             lockTask: studentTaskLockByUsn.get(assignment.usn) ?? false,
           }
@@ -233,7 +255,7 @@ export default function AdminAssignmentsDashboardPage() {
   return (
     <ModulePage
       title="Admin Assignment Dashboard"
-      purpose="View every student assignment, filter records, export CSV, and monitor assignment distribution from one place."
+      purpose="View every student assignment, impersonate students for profile/task fixes, export CSV, and monitor assignment distribution from one place."
       status="available"
       nextActionLabel="Open Assignment Management"
       nextActionTo="/task-assignment"
@@ -387,13 +409,31 @@ export default function AdminAssignmentsDashboardPage() {
                     mustChange === undefined ? 'unknown' : mustChange ? 'default/reset-required' : 'changed'
                   const persistedLocked = studentTaskLockByUsn.get(assignment.usn) ?? false
                   const control = rowControls[assignment.usn] ?? {
+                    name: assignment.name,
                     taskId: assignment.taskId,
                     lockTask: persistedLocked,
                   }
                   const task = getTaskById(assignment.taskId)
                   return (
                     <tr key={assignment.usn}>
-                      <td>{assignment.name}</td>
+                      <td>
+                        <input
+                          type="text"
+                          value={control.name}
+                          onChange={(event) => {
+                            const value = event.target.value
+                            setRowControls((previous) => ({
+                              ...previous,
+                              [assignment.usn]: {
+                                ...(previous[assignment.usn] ?? control),
+                                name: value,
+                              },
+                            }))
+                          }}
+                          placeholder="Student name"
+                          aria-label={`Student name for ${assignment.usn}`}
+                        />
+                      </td>
                       <td>{assignment.usn}</td>
                       <td>{passwordStatus}</td>
                       <td>
@@ -450,13 +490,14 @@ export default function AdminAssignmentsDashboardPage() {
                           <button
                             type="button"
                             className="button-link secondary icon-action"
-                            disabled={taskControlMutation.isPending}
-                            title="Save task and lock state"
-                            aria-label="Save task and lock state"
+                            disabled={impersonationMutation.isPending}
+                            title="Save impersonation changes"
+                            aria-label="Save impersonation changes"
                             onClick={() => {
                               setRowActionMessage('')
-                              taskControlMutation.mutate({
+                              impersonationMutation.mutate({
                                 usn: assignment.usn,
+                                name: control.name,
                                 taskId: control.taskId,
                                 lockTask: control.lockTask,
                               })

@@ -91,6 +91,16 @@ export type AdminTaskControlResult = {
   taskLocked: boolean
 }
 
+export type AdminStudentImpersonationUpdateResult = {
+  usn: string
+  name: string
+  taskId: string
+  taskLocked: boolean
+  nameChanged: boolean
+  taskChanged: boolean
+  lockChanged: boolean
+}
+
 export const STUDENT_TASKS: StudentTask[] = [
   {
     id: 'S01',
@@ -388,6 +398,40 @@ export async function adminSetStudentTaskControl(
     usn: response.data.usn,
     taskId: response.data.task_id,
     taskLocked: response.data.task_locked,
+  }
+}
+
+export async function adminImpersonateStudentUpdate(
+  usn: string,
+  payload: { newName?: string; taskId?: string; lockTask?: boolean },
+): Promise<AdminStudentImpersonationUpdateResult> {
+  const response = await axios.put<{
+    usn: string
+    name: string
+    task_id: string
+    task_locked: boolean
+    name_changed: boolean
+    task_changed: boolean
+    lock_changed: boolean
+  }>(
+    `${API_BASE}/admin/students/${encodeURIComponent(usn)}/impersonate`,
+    {
+      new_name: payload.newName?.trim() ? payload.newName.trim() : null,
+      task_id: payload.taskId?.trim() ? payload.taskId.trim().toUpperCase() : null,
+      lock_task: payload.lockTask ?? null,
+    },
+    {
+      headers: getAdminAuthHeaders(),
+    },
+  )
+  return {
+    usn: response.data.usn,
+    name: response.data.name,
+    taskId: response.data.task_id,
+    taskLocked: response.data.task_locked,
+    nameChanged: response.data.name_changed,
+    taskChanged: response.data.task_changed,
+    lockChanged: response.data.lock_changed,
   }
 }
 

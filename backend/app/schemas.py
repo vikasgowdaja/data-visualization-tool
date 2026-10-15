@@ -245,6 +245,22 @@ class StudentTaskControlResponse(BaseModel):
     task_locked: bool
 
 
+class AdminStudentImpersonationUpdateRequest(BaseModel):
+    new_name: str | None = Field(default=None, max_length=120)
+    task_id: str | None = Field(default=None, min_length=1, max_length=20)
+    lock_task: bool | None = None
+
+
+class AdminStudentImpersonationUpdateResponse(BaseModel):
+    usn: str
+    name: str
+    task_id: str
+    task_locked: bool
+    name_changed: bool
+    task_changed: bool
+    lock_changed: bool
+
+
 class SeedStudentsResponse(BaseModel):
     seeded: int
     students_synced: int = 0
