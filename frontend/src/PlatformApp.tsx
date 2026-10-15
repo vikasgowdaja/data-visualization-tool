@@ -29,7 +29,6 @@ const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const navItems = [
-<<<<<<< HEAD
   { to: ROUTES.DASHBOARD, label: 'Dashboard' },
   { to: ROUTES.LEARN, label: 'Learn' },
   { to: ROUTES.DATASETS, label: 'Datasets' },
@@ -47,26 +46,6 @@ const navItems = [
   { to: ROUTES.LOGIN, label: 'Login Portal' },
   { to: ROUTES.TASK_ASSIGNMENT, label: 'Task Assignment' },
   { to: ROUTES.ADMIN_ASSIGNMENTS, label: 'Admin Dashboard' },
-=======
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/learn', label: 'Learn' },
-  { to: '/datasets', label: 'Datasets' },
-  { to: '/data-explorer', label: 'Data Explorer' },
-  { to: '/data-explorer/legacy', label: 'Legacy Workspace' },
-  { to: '/data-cleaning-lab', label: 'Data Cleaning Lab' },
-  { to: '/visualization-lab', label: 'Visualization Lab' },
-  { to: '/statistics-lab', label: 'Statistics Lab' },
-  { to: '/insights-lab', label: 'Insights Lab' },
-  { to: '/practice', label: 'Practice' },
-  { to: '/challenges', label: 'Challenges' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/learning-path', label: 'Learning Path' },
-  { to: '/resources', label: 'Resources' },
-  { to: '/progress', label: 'Progress' },
-  { to: '/login', label: 'Login Portal' },
-  { to: '/task-assignment', label: 'Task Assignment' },
-  { to: '/admin-assignments', label: 'Admin Dashboard' },
->>>>>>> cf1483947e4a717dc2330f6f54b1dbfe96c4457d
 ]
 
 export default function PlatformApp() {
