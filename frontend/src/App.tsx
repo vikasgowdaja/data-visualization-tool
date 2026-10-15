@@ -1,7 +1,8 @@
 import { toNumber, groupMean, histogram, correlation, getOutlierCount } from './utils/dataMath'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
+import { toPng } from 'html-to-image'
 import {
   Bar,
   BarChart,
@@ -356,6 +357,7 @@ function renderHighlightedText(text: string, words: string[]): Array<{ text: str
 }
 
 function App() {
+  const chartRef = useRef<HTMLDivElement | null>(null)
   const [selectedProject, setSelectedProject] = useState<DatasetId>('student_performance')
   const [numRecords, setNumRecords] = useState<number>(500)
   const [includeMissingValues, setIncludeMissingValues] = useState(true)
@@ -668,6 +670,23 @@ function App() {
     window.open(`${API_BASE}/datasets/${datasetSummary.dataset_id}/download`, '_blank')
   }
 
+  const handleChartExport = async () => {
+    if (!chartRef.current) {
+      return
+    }
+
+    try {
+      const dataUrl = await toPng(chartRef.current)
+      const anchor = document.createElement('a')
+      anchor.href = dataUrl
+      anchor.download = `chart-${chartType}.png`
+      anchor.click()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setStatusMessage(`Failed to export chart as PNG: ${message}`)
+    }
+  }
+
   return (
     <div className="lab-shell">
       <header className="hero-panel">
@@ -858,7 +877,7 @@ function App() {
                 </select>
               </label>
             </div>
-            <div className="chart-area">
+            <div className="chart-area" ref={chartRef}>
               <ResponsiveContainer width="100%" height={330}>
                 {chartType === 'scatter' ? (
                   <ScatterChart>
@@ -894,6 +913,23 @@ function App() {
                   </BarChart>
                 )}
               </ResponsiveContainer>
+            </div>
+            <div className="button-row">
+              <button
+                type="button"
+                className="ghost"
+                onClick={handleChartExport}
+                disabled={
+                  datasetRows.length === 0 ||
+                  (chartType === 'bar'
+                    ? barChartData.length === 0
+                    : chartType === 'histogram'
+                      ? histogramData.length === 0
+                      : scatterLineData.length === 0)
+                }
+              >
+                Export chart as PNG
+              </button>
             </div>
             <div className="interpretation-box">
               <h4>Student Interpretation</h4>
