@@ -16,6 +16,50 @@ import {
   type StudentTaskType,
 } from '../services/taskAssignments'
 
+function LockClosedIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M17 10h-1V8a4 4 0 00-8 0v2H7a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2v-8a2 2 0 00-2-2zm-6 6.73V18a1 1 0 002 0v-1.27a2 2 0 10-2 0zM10 10V8a2 2 0 114 0v2h-4z"
+      />
+    </svg>
+  )
+}
+
+function LockOpenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M17 8h-6a2 2 0 00-2 2v2H7a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-6v-2a4 4 0 017.46-2h2.22A6 6 0 0011 10v2h6v8H7v-6h10V8z"
+      />
+    </svg>
+  )
+}
+
+function SaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4zM7 5h8v4H7V5zm12 14H5V5h1v6h10V5h.17L19 7.83V19zm-7-1a3 3 0 110-6 3 3 0 010 6z"
+      />
+    </svg>
+  )
+}
+
+function ResetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 5a7 7 0 016.65 4.8h2.1A9 9 0 0012 3a8.96 8.96 0 00-6.36 2.64L3 8.29V4H1v8h8V10H4.41l2.13-2.12A6.96 6.96 0 0112 5zm0 14a7 7 0 01-6.65-4.8h-2.1A9 9 0 0012 21a8.96 8.96 0 006.36-2.64L21 15.71V20h2v-8h-8v2h4.59l-2.13 2.12A6.96 6.96 0 0112 19z"
+      />
+    </svg>
+  )
+}
+
 type RowControlState = {
   taskId: string
   lockTask: boolean
@@ -342,9 +386,10 @@ export default function AdminAssignmentsDashboardPage() {
                   const mustChange = studentStatusByUsn.get(assignment.usn)
                   const passwordStatus =
                     mustChange === undefined ? 'unknown' : mustChange ? 'default/reset-required' : 'changed'
+                  const persistedLocked = studentTaskLockByUsn.get(assignment.usn) ?? false
                   const control = rowControls[assignment.usn] ?? {
                     taskId: assignment.taskId,
-                    lockTask: studentTaskLockByUsn.get(assignment.usn) ?? false,
+                    lockTask: persistedLocked,
                   }
                   const task = getTaskById(assignment.taskId)
                   return (
@@ -352,16 +397,23 @@ export default function AdminAssignmentsDashboardPage() {
                       <td>{assignment.name}</td>
                       <td>{assignment.usn}</td>
                       <td>{passwordStatus}</td>
-                      <td>{control.lockTask ? 'Locked' : 'Open'}</td>
+                      <td>
+                        <span
+                          className={`lock-status-badge ${persistedLocked ? 'locked' : 'open'}`}
+                          title={persistedLocked ? 'Locked' : 'Open'}
+                          aria-label={persistedLocked ? 'Locked' : 'Open'}
+                        />
+                      </td>
                       <td>{task?.id ?? assignment.taskId}</td>
                       <td>{task?.type ?? 'unknown'}</td>
                       <td>{task?.title ?? 'Task unavailable'}</td>
                       <td>{task?.details ?? 'No task details found.'}</td>
                       <td>{new Date(assignment.assignedAt).toLocaleString()}</td>
                       <td>
-                        <div className="assignment-form">
+                        <div className="assignment-form row-actions-compact">
                           <select
                             value={control.taskId}
+                            disabled={persistedLocked}
                             onChange={(event) => {
                               const value = event.target.value
                               setRowControls((previous) => ({
@@ -379,27 +431,29 @@ export default function AdminAssignmentsDashboardPage() {
                               </option>
                             ))}
                           </select>
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={control.lockTask}
-                              onChange={(event) => {
-                                const value = event.target.checked
-                                setRowControls((previous) => ({
-                                  ...previous,
-                                  [assignment.usn]: {
-                                    ...(previous[assignment.usn] ?? control),
-                                    lockTask: value,
-                                  },
-                                }))
-                              }}
-                            />
-                            Lock
-                          </label>
                           <button
                             type="button"
-                            className="button-link secondary"
+                            className="button-link secondary icon-action"
+                            title={control.lockTask ? 'Set unlocked state' : 'Set locked state'}
+                            aria-label={control.lockTask ? 'Set unlocked state' : 'Set locked state'}
+                            onClick={() => {
+                              setRowControls((previous) => ({
+                                ...previous,
+                                [assignment.usn]: {
+                                  ...(previous[assignment.usn] ?? control),
+                                  lockTask: !control.lockTask,
+                                },
+                              }))
+                            }}
+                          >
+                            {control.lockTask ? <LockClosedIcon /> : <LockOpenIcon />}
+                          </button>
+                          <button
+                            type="button"
+                            className="button-link secondary icon-action"
                             disabled={taskControlMutation.isPending}
+                            title="Save task and lock state"
+                            aria-label="Save task and lock state"
                             onClick={() => {
                               setRowActionMessage('')
                               taskControlMutation.mutate({
@@ -409,18 +463,20 @@ export default function AdminAssignmentsDashboardPage() {
                               })
                             }}
                           >
-                            Save
+                            <SaveIcon />
                           </button>
                           <button
                             type="button"
-                            className="button-link secondary"
+                            className="button-link secondary icon-action"
                             disabled={resetPasswordMutation.isPending}
+                            title="Reset password to default"
+                            aria-label="Reset password to default"
                             onClick={() => {
                               setRowActionMessage('')
                               resetPasswordMutation.mutate(assignment.usn)
                             }}
                           >
-                            Reset Password
+                            <ResetIcon />
                           </button>
                         </div>
                       </td>
