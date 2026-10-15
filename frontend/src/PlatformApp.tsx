@@ -32,6 +32,7 @@ const navItems = [
   { to: '/learn', label: 'Learn' },
   { to: '/datasets', label: 'Datasets' },
   { to: '/data-explorer', label: 'Data Explorer' },
+  { to: '/data-explorer/legacy', label: 'Legacy Workspace' },
   { to: '/data-cleaning-lab', label: 'Data Cleaning Lab' },
   { to: '/visualization-lab', label: 'Visualization Lab' },
   { to: '/statistics-lab', label: 'Statistics Lab' },
