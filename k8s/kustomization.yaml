@@ -6,4 +6,5 @@ resources:
   - backend-configmap.yaml
   - backend.yaml
   - frontend.yaml
+  - hpa.yaml
   - ingress.yaml

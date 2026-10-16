@@ -199,7 +199,28 @@ base64 -w 0 ~/.kube/config
 - Push to `main`, or
 - Run manually from `Actions -> CI-CD Kubernetes -> Run workflow`.
 
-### Important note for Docker Desktop Kubernetes
+### Self-hosted runner for Kubernetes deployments
+
+The deploy job now runs on a `self-hosted` GitHub Actions runner, so it can deploy directly to clusters reachable from your own network (including local Docker Desktop Kubernetes, Minikube, or Kind).
+
+Keep these jobs on GitHub-hosted runners:
+- tests
+- image build/push
+
+Run deployment on self-hosted runner:
+- `deploy-to-kubernetes`
+
+### Important note for local Kubernetes
+
+For local clusters, register the self-hosted runner on the same machine (or same network) as the cluster and provide `KUBE_CONFIG_B64` for that context.
+
+Kubernetes deployments already self-heal: if you manually delete a pod, the Deployment controller recreates it to maintain desired replicas.
+
+This repo also includes HPA in [k8s/hpa.yaml](k8s/hpa.yaml), with `minReplicas: 1` for both frontend and backend to keep a minimum pod count.
+
+If your cluster does not have Metrics Server, HPA metrics-based scaling will not activate until Metrics Server is installed.
+
+### Previous limitation (GitHub-hosted only)
 
 GitHub-hosted runners (`ubuntu-latest`) cannot directly reach your local Docker Desktop cluster.
 For local-cluster deployments, use a self-hosted runner on the same machine, or deploy to a reachable remote cluster (AKS/EKS/GKE) using `KUBE_CONFIG_B64` for that cluster.

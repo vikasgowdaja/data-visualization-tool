@@ -126,7 +126,7 @@ jobs:
   deploy-to-kubernetes:
     needs: build-and-push-images
     if: ${{ needs.build-and-push-images.outputs.can_push == 'true' && needs.build-and-push-images.outputs.has_kubeconfig == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
 
     steps:
       - name: Checkout
@@ -136,62 +136,31 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
+        shell: pwsh
         env:
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
-
-      - name: Validate kubeconfig endpoint
-        id: deploy_prereq
-        run: |
-          KUBE_SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
-          DEPLOY_READY="$({ KUBE_SERVER="$KUBE_SERVER" python3 - <<'PY'
-          import ipaddress
-          import os
-          from urllib.parse import urlparse
-
-          server = os.environ.get("KUBE_SERVER", "").strip().strip('"').strip("'")
-          if not server:
-              print("false")
-          else:
-              host = urlparse(server).hostname
-              if not host or host.lower() == "localhost":
-                  print("false")
-              else:
-                  try:
-                      print("false" if ipaddress.ip_address(host).is_loopback else "true")
-                  except ValueError:
-                      print("true")
-          PY
-          } 2>/dev/null || echo false)"
-          case "$DEPLOY_READY" in
-            true|false) ;;
-            *)
-              DEPLOY_READY="false"
-              ;;
-          esac
-          echo "deploy_ready=$DEPLOY_READY" >> "$GITHUB_OUTPUT"
-          if [ "$DEPLOY_READY" != "true" ]; then
-            DEPLOY_READY="false"
-            echo "Kubeconfig server is missing or local-only; skipping deploy steps."
-          fi
+          $kubeDir = Join-Path $HOME ".kube"
+          New-Item -ItemType Directory -Path $kubeDir -Force | Out-Null
+          $configPath = Join-Path $kubeDir "config"
+          $bytes = [Convert]::FromBase64String($env:KUBE_CONFIG_B64)
+          [IO.File]::WriteAllBytes($configPath, $bytes)
 
       - name: Apply manifests
-        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
+        shell: pwsh
         run: kubectl apply -k k8s
 
       - name: Update images and rollout
-        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
+        shell: pwsh
         env:
           BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
         run: |
-          kubectl -n "$K8S_NAMESPACE" set image deployment/datascience-lab-backend backend="$BACKEND_IMAGE"
-          kubectl -n "$K8S_NAMESPACE" set image deployment/datascience-lab-frontend frontend="$FRONTEND_IMAGE"
-          kubectl -n "$K8S_NAMESPACE" rollout status deployment/datascience-lab-backend --timeout=180s
-          kubectl -n "$K8S_NAMESPACE" rollout status deployment/datascience-lab-frontend --timeout=180s
+          kubectl -n $env:K8S_NAMESPACE set image deployment/datascience-lab-backend backend=$env:BACKEND_IMAGE
+          kubectl -n $env:K8S_NAMESPACE set image deployment/datascience-lab-frontend frontend=$env:FRONTEND_IMAGE
+          kubectl -n $env:K8S_NAMESPACE rollout status deployment/datascience-lab-backend --timeout=180s
+          kubectl -n $env:K8S_NAMESPACE rollout status deployment/datascience-lab-frontend --timeout=180s
 
       - name: Deployment snapshot
-        if: ${{ steps.deploy_prereq.outputs.deploy_ready == 'true' }}
-        run: kubectl -n "$K8S_NAMESPACE" get deploy,pods,svc,ingress
+        shell: pwsh
+        run: kubectl -n $env:K8S_NAMESPACE get deploy,pods,svc,ingress
