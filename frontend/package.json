@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "k8s:deploy:once": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\k8s-local-watch-deploy.ps1 -Once",
+    "k8s:watch": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\k8s-local-watch-deploy.ps1"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",

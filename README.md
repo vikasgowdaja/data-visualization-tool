@@ -127,6 +127,41 @@ Delete all Kubernetes resources:
 kubectl delete -k k8s
 ```
 
+### Local Kubernetes auto rebuild + rollout watcher (no Tilt/Skaffold)
+
+For local development, you can run one PowerShell watcher that:
+
+1. Watches backend/frontend/k8s files.
+2. Rebuilds Docker images.
+3. Loads images to local cluster when needed (kind/minikube).
+4. Applies manifests.
+5. Updates deployment images and waits for rollout.
+
+Run once (single deploy):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\k8s-local-watch-deploy.ps1 -Once
+```
+
+Run in watch mode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\k8s-local-watch-deploy.ps1
+```
+
+Optional cluster override:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\k8s-local-watch-deploy.ps1 -ClusterType kind
+```
+
+Frontend shortcuts (from [frontend/](frontend)):
+
+```powershell
+npm run k8s:deploy:once
+npm run k8s:watch
+```
+
 ## GitHub Actions CI/CD (Docker + Kubernetes)
 
 This repository includes a CI/CD workflow at [.github/workflows/ci-cd-k8s.yml](.github/workflows/ci-cd-k8s.yml).
