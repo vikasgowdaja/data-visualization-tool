@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: data-visualization-tool
 resources:
   - namespace.yaml
+  - backend-configmap.yaml
   - backend.yaml
   - frontend.yaml
   - ingress.yaml

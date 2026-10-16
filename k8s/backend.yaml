@@ -19,11 +19,12 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-          env:
-            - name: CORS_ALLOW_ORIGINS
-              value: "http://localhost:5173,http://127.0.0.1:5173,http://datascience-lab.local"
-            - name: CORS_ALLOW_CREDENTIALS
-              value: "false"
+          envFrom:
+            - configMapRef:
+                name: datascience-lab-backend-config
+            - secretRef:
+                name: datascience-lab-backend-secrets
+                optional: true
           readinessProbe:
             httpGet:
               path: /api/health

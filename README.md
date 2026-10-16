@@ -29,7 +29,7 @@ npm run dev
 
 ## Docker Development
 
-Run backend and frontend together with Docker Compose:
+Run MongoDB, backend, and frontend together with Docker Compose:
 
 ```powershell
 docker compose up --build
@@ -40,6 +40,7 @@ Access:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000/api
 - Backend docs: http://localhost:8000/docs
+- MongoDB: mongodb://localhost:27017
 
 Stop containers:
 
@@ -79,6 +80,14 @@ If you are using a remote cluster, push both images to your registry and update 
 ```powershell
 kubectl apply -k k8s
 ```
+
+Optional: create runtime secrets (recommended for non-local clusters):
+
+```powershell
+kubectl apply -f k8s/backend-secrets.example.yaml
+```
+
+Then replace placeholder values in your secret with real credentials.
 
 ### 3) Access the app
 

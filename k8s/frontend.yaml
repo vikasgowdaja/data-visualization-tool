@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: datascience-lab-frontend:k8s-v2
+          image: datascience-lab-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

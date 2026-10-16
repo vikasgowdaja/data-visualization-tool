@@ -1,14 +1,35 @@
 services:
+  mongodb:
+    image: mongo:7
+    container_name: datascience-lab-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: datascience-lab-backend
+    depends_on:
+      mongodb:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
       CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       CORS_ALLOW_CREDENTIALS: "false"
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DB_NAME: datascience_lab
+    volumes:
+      - ./backend/data:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 15s
@@ -28,3 +49,6 @@ services:
         condition: service_healthy
     ports:
       - "5173:80"
+
+volumes:
+  mongodb_data:
