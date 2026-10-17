@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { clearAdminToken, getAdminToken } from '../services/adminAuth'
 import { clearStudentSession, getStudentSession } from '../services/studentAuth'
 import { saveLastModule } from '../services/studentState'
+import ThemeToggle from './ThemeToggle'
 
 type NavItem = {
   to: string
@@ -120,19 +121,22 @@ export default function AppShell({ navItems, children }: AppShellProps) {
             <p className="breadcrumbs">{breadcrumbs.join(' / ')}</p>
             <h1 className="module-indicator">{currentModule}</h1>
           </div>
-          {studentUsn && (
-            <div className="profile-chip" aria-label="Student profile">
-              <span>Student: {studentUsn}</span>
-              <button type="button" className="button-link secondary" onClick={handleStudentLogout}>
-                Student Logout
+          <div className="header-actions">
+            <ThemeToggle />
+            {studentUsn && (
+              <div className="profile-chip" aria-label="Student profile">
+                <span>Student: {studentUsn}</span>
+                <button type="button" className="button-link secondary" onClick={handleStudentLogout}>
+                  Student Logout
+                </button>
+              </div>
+            )}
+            {hasAdminSession && (
+              <button type="button" className="button-link secondary" onClick={handleAdminLogout}>
+                Admin Logout
               </button>
-            </div>
-          )}
-          {hasAdminSession && (
-            <button type="button" className="button-link secondary" onClick={handleAdminLogout}>
-              Admin Logout
-            </button>
-          )}
+            )}
+          </div>
         </header>
         <main className="main-content">{children}</main>
       </div>
