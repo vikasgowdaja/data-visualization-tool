@@ -3,6 +3,7 @@
 This repository is a monorepo with separate frontend and backend applications.
 
 Detailed setup and deployment documentation for the current codebase is available at [docs/APPLICATION_SETUP_AND_DEPLOYMENT.md](docs/APPLICATION_SETUP_AND_DEPLOYMENT.md).
+Self-hosted runner setup/maintenance runbook is available at [docs/SELF_HOSTED_RUNNER_OPERATIONS.md](docs/SELF_HOSTED_RUNNER_OPERATIONS.md).
 
 ## Structure
 
