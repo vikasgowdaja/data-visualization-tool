@@ -136,7 +136,7 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
-        shell: pwsh
+        shell: powershell
         env:
           KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
@@ -147,11 +147,11 @@ jobs:
           [IO.File]::WriteAllBytes($configPath, $bytes)
 
       - name: Apply manifests
-        shell: pwsh
+        shell: powershell
         run: kubectl apply -k k8s
 
       - name: Update images and rollout
-        shell: pwsh
+        shell: powershell
         env:
           BACKEND_IMAGE: ${{ needs.build-and-push-images.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push-images.outputs.frontend_image }}
@@ -162,5 +162,5 @@ jobs:
           kubectl -n $env:K8S_NAMESPACE rollout status deployment/datascience-lab-frontend --timeout=180s
 
       - name: Deployment snapshot
-        shell: pwsh
+        shell: powershell
         run: kubectl -n $env:K8S_NAMESPACE get deploy,pods,svc,ingress
