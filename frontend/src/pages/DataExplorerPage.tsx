@@ -1,4 +1,3 @@
-import { toNumber } from '../utils/dataMath'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
@@ -21,6 +20,55 @@ import type { DatasetId, Difficulty } from '../types/dataset'
 type ExplorerTab = 'overview' | 'preview' | 'columns' | 'statistics' | 'missing' | 'duplicates' | 'outliers'
 
 type SortDirection = 'asc' | 'desc'
+
+const GENERATOR_PRESETS: Record<
+  Difficulty,
+  {
+    numRecords: number
+    includeMissingValues: boolean
+    includeOutliers: boolean
+    advancedMode: boolean
+    missingPercentage: number
+    outlierPercentage: number
+    noiseLevel: number
+  }
+> = {
+  beginner: {
+    numRecords: 100,
+    includeMissingValues: false,
+    includeOutliers: false,
+    advancedMode: false,
+    missingPercentage: 0,
+    outlierPercentage: 0,
+    noiseLevel: 1,
+  },
+  intermediate: {
+    numRecords: 1000,
+    includeMissingValues: true,
+    includeOutliers: true,
+    advancedMode: true,
+    missingPercentage: 5,
+    outlierPercentage: 2,
+    noiseLevel: 1.2,
+  },
+  advanced: {
+    numRecords: 5000,
+    includeMissingValues: true,
+    includeOutliers: true,
+    advancedMode: true,
+    missingPercentage: 20,
+    outlierPercentage: 10,
+    noiseLevel: 2.5,
+  },
+}
+
+function toNullableNumber(input: string): number | undefined {
+  if (!input.trim()) {
+    return undefined
+  }
+  const n = Number(input)
+  return Number.isFinite(n) ? n : undefined
+}
 
 export default function DataExplorerPage() {
   const [selectedProject, setSelectedProject] = useState<DatasetId>('student_performance')
@@ -143,8 +191,8 @@ export default function DataExplorerPage() {
         sort_dir: sortDir,
         filter_column: filterColumn,
         filter_value: filterValue,
-        numeric_min: toNumber(numericMinText) ?? undefined,
-        numeric_max: toNumber(numericMaxText) ?? undefined,
+        numeric_min: toNullableNumber(numericMinText),
+        numeric_max: toNullableNumber(numericMaxText),
         missing_only: missingOnly,
       }),
     enabled: Boolean(datasetId),
@@ -161,6 +209,18 @@ export default function DataExplorerPage() {
   const selectedProjectTitle =
     useMemo(() => PROJECTS.find((project) => project.id === selectedProject)?.title, [selectedProject]) ??
     'Selected Dataset'
+
+  const applyGeneratorPreset = (presetName: Difficulty) => {
+    const preset = GENERATOR_PRESETS[presetName]
+    setNumRecords(preset.numRecords)
+    setDifficulty(presetName)
+    setIncludeMissingValues(preset.includeMissingValues)
+    setIncludeOutliers(preset.includeOutliers)
+    setAdvancedMode(preset.advancedMode)
+    setMissingPercentage(preset.missingPercentage)
+    setOutlierPercentage(preset.outlierPercentage)
+    setNoiseLevel(preset.noiseLevel)
+  }
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -208,6 +268,17 @@ export default function DataExplorerPage() {
     >
       <section className="card">
         <h2>Dataset Generator 2.0 (Phase 3 Baseline)</h2>
+        <div className="preset-row" role="group" aria-label="Generator presets">
+          <button type="button" onClick={() => applyGeneratorPreset('beginner')}>
+            Beginner
+          </button>
+          <button type="button" onClick={() => applyGeneratorPreset('intermediate')}>
+            Intermediate
+          </button>
+          <button type="button" onClick={() => applyGeneratorPreset('advanced')}>
+            Advanced
+          </button>
+        </div>
         <div className="form-grid">
           <label>
             Dataset
