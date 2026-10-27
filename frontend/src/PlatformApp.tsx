@@ -19,6 +19,7 @@ const ChallengesPage = lazy(() => import('./pages/ChallengesPage'))
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 const ResourcesPage = lazy(() => import('./pages/ResourcesPage'))
+const TrainingReportPage = lazy(() => import('./pages/TrainingReportPage'))
 const ProgressPage = lazy(() => import('./pages/ProgressPage'))
 const CommonLoginPage = lazy(() => import('./pages/CommonLoginPage'))
 const TaskAssignmentPage = lazy(() => import('./pages/TaskAssignmentPage'))
@@ -42,6 +43,7 @@ const navItems = [
   { to: '/projects', label: 'Projects' },
   { to: '/learning-path', label: 'Learning Path' },
   { to: '/resources', label: 'Resources' },
+  { to: '/training-report', label: 'Training Report' },
   { to: '/progress', label: 'Progress' },
   { to: '/login', label: 'Login Portal' },
   { to: '/task-assignment', label: 'Task Assignment' },
@@ -70,6 +72,7 @@ export default function PlatformApp() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/learning-path" element={<LearningPathPage />} />
             <Route path="/resources" element={<ResourcesPage />} />
+            <Route path="/training-report" element={<TrainingReportPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/login" element={<CommonLoginPage />} />
             <Route path="/student-login" element={<StudentLoginPage />} />
